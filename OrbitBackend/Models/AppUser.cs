@@ -8,5 +8,9 @@ namespace OrbitBackend.Models
         public int Age { get; set; }
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiryTime { get; set; }
+
+        
+        public string? StreamKey { get; set; }
+        public ICollection<LiveStream> LiveStreams { get; set; } = new List<LiveStream>();
     }
 }

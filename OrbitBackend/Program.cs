@@ -19,6 +19,7 @@ namespace OrbitBackend
             builder.Services.AddJwtAuthentication(builder.Configuration);
             builder.Services.AddApplicationServices();
             builder.Services.AddControllers();
+            builder.Services.AddHttpContextAccessor();
             builder.Services.AddSwaggerConfiguration();
 
             var app = builder.Build();
@@ -33,8 +34,8 @@ namespace OrbitBackend
             app.UseSwagger();
             app.UseSwaggerUI();
 
-            if (app.Environment.IsDevelopment())
-                app.UseHttpsRedirection();
+            
+            
 
             app.UseStaticFiles();
             app.UseAuthentication();

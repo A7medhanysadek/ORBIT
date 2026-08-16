@@ -1,6 +1,7 @@
 using AutoMapper;
 using OrbitBackend.DTOs.Account;
 using OrbitBackend.DTOs.Auth;
+using OrbitBackend.DTOs.Streaming;
 using OrbitBackend.Models;
 
 namespace OrbitBackend.Mapping
@@ -45,6 +46,16 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
                 .ForMember(dest => dest.EmailConfirmed, opt => opt.MapFrom(src => src.EmailConfirmed))
                 .ForMember(dest => dest.Roles, opt => opt.Ignore());
+
+            
+            CreateMap<LiveStream, StreamResponseDto>()
+                .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
+                .ForMember(dest => dest.HlsUrl, opt => opt.Ignore());
+
+            CreateMap<LiveStream, LiveStreamSummaryDto>()
+                .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
+                .ForMember(dest => dest.HlsUrl, opt => opt.Ignore());
         }
     }
 }
+
