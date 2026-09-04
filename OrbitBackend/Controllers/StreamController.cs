@@ -172,6 +172,31 @@ namespace OrbitBackend.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Called by nginx-rtmp when a stream recording finishes (on_record_done).
+        /// Saves the recording file name to the stream record for VOD playback.
+        /// </summary>
+        [HttpPost("rtmp/on-record-done")]
+        [AllowAnonymous]
+        [Consumes("application/x-www-form-urlencoded")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ApiExplorerSettings(IgnoreApi = true)] 
+        public async Task<IActionResult> OnRecordDone([FromForm] RtmpCallbackDto dto)
+        {
+            if (!ValidateCallbackSecret(dto.Secret))
+                return StatusCode(StatusCodes.Status403Forbidden);
+
+            var streamKey = dto.Name;
+            var filePath = dto.Path;
+
+            if (string.IsNullOrEmpty(streamKey) || string.IsNullOrEmpty(filePath))
+                return Ok(); // Nothing to do
+
+            await _streamService.SaveRecordingPathAsync(streamKey, filePath);
+            return Ok();
+        }
+
         
 
         private string GetUserId()

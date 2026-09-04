@@ -14,6 +14,7 @@ namespace OrbitBackend.Configuration
             services.AddScoped<IAccountService, AccountService>();
             services.AddScoped<IMailService, MailService>();
             services.AddScoped<IStreamService, StreamService>();
+            services.AddScoped<IChatService, ChatService>();
             services.AddSingleton<IMediaServerConfigService, MediaServerConfigService>();
 
             return services;

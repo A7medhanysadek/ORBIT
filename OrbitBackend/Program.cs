@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrbitBackend.Configuration;
 using OrbitBackend.Data;
 using OrbitBackend.Data.Seeding;
+using OrbitBackend.Hubs;
 using OrbitBackend.Middleware;
 
 namespace OrbitBackend
@@ -19,8 +20,21 @@ namespace OrbitBackend
             builder.Services.AddJwtAuthentication(builder.Configuration);
             builder.Services.AddApplicationServices();
             builder.Services.AddControllers();
+            builder.Services.AddSignalR();
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddSwaggerConfiguration();
+
+            // CORS — required for SignalR WebSocket connections from browser clients
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials()
+                          .SetIsOriginAllowed(_ => true); // Allow all origins in development
+                });
+            });
 
             var app = builder.Build();
 
@@ -34,13 +48,15 @@ namespace OrbitBackend
             app.UseSwagger();
             app.UseSwaggerUI();
 
-            
-            
+            app.UseCors();
 
             app.UseStaticFiles();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+
+            // Map SignalR hub for real-time stream chat
+            app.MapHub<StreamChatHub>("/hubs/stream-chat");
 
             app.Run();
         }

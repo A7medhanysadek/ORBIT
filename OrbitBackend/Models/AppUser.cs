@@ -12,5 +12,6 @@ namespace OrbitBackend.Models
         
         public string? StreamKey { get; set; }
         public ICollection<LiveStream> LiveStreams { get; set; } = new List<LiveStream>();
+        public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
     }
 }

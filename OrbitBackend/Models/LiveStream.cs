@@ -10,8 +10,15 @@ namespace OrbitBackend.Models
         public DateTime? EndedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        /// <summary>
+        /// File name of the recorded stream (set by nginx on_record_done callback).
+        /// Null if no recording exists.
+        /// </summary>
+        public string? RecordingFileName { get; set; }
+
         
         public string StreamerId { get; set; } = string.Empty;
         public AppUser Streamer { get; set; } = null!;
+        public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
     }
 }

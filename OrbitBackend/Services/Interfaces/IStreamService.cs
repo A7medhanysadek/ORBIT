@@ -49,5 +49,10 @@ namespace OrbitBackend.Services.Interfaces
         
         
         Task<StreamResponseDto> GetStreamByIdAsync(int id);
+
+        /// <summary>
+        /// Saves the recording file path received from nginx on_record_done callback.
+        /// </summary>
+        Task SaveRecordingPathAsync(string streamKey, string filePath);
     }
 }

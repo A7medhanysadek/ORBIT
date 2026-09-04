@@ -223,7 +223,37 @@ namespace OrbitBackend.Services
             return MapToResponseDto(stream, stream.Streamer);
         }
 
-        
+        public async Task SaveRecordingPathAsync(string streamKey, string filePath)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.StreamKey == streamKey);
+
+            if (user == null)
+            {
+                _logger.LogWarning("on_record_done received for unknown stream key.");
+                return;
+            }
+
+            // Find the most recently ended stream for this user
+            var stream = await _context.LiveStreams
+                .Where(s => s.StreamerId == user.Id && !s.IsLive && s.EndedAt != null)
+                .OrderByDescending(s => s.EndedAt)
+                .FirstOrDefaultAsync();
+
+            if (stream == null)
+            {
+                _logger.LogWarning("on_record_done received but no ended stream found for user {UserId}.", user.Id);
+                return;
+            }
+
+            // Extract just the file name from the full path
+            stream.RecordingFileName = System.IO.Path.GetFileName(filePath);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Recording saved for stream {StreamId}: {FileName}",
+                stream.Id, stream.RecordingFileName);
+        }
 
         private static string GenerateSecureStreamKey()
         {
@@ -247,6 +277,15 @@ namespace OrbitBackend.Services
         {
             var hlsBaseUrl = _mediaServerConfig.GetHlsBaseUrl();
 
+            // Build VOD URL if the stream has a recording
+            string? vodUrl = null;
+            if (!stream.IsLive && !string.IsNullOrEmpty(stream.RecordingFileName))
+            {
+                var recordingsBaseUrl = _config["Streaming:RecordingsBaseUrl"]
+                    ?? hlsBaseUrl.Replace("/hls", "/recordings");
+                vodUrl = $"{recordingsBaseUrl}/{stream.RecordingFileName}";
+            }
+
             return new StreamResponseDto
             {
                 Id = stream.Id,
@@ -254,6 +293,7 @@ namespace OrbitBackend.Services
                 Description = stream.Description,
                 IsLive = stream.IsLive,
                 HlsUrl = stream.IsLive ? $"{hlsBaseUrl}/{streamer.StreamKey}.m3u8" : null,
+                VodUrl = vodUrl,
                 StreamerId = stream.StreamerId,
                 StreamerName = streamer.FullName,
                 StartedAt = stream.StartedAt,
