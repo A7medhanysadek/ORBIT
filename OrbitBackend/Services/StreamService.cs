@@ -290,24 +290,25 @@ namespace OrbitBackend.Services
                 return;
             }
 
-            // Find the most recently ended stream for this channel
+            // Find the active or most recent stream for this channel
             var stream = await _context.LiveStreams
-                .Where(s => s.ChannelId == channel.Id && !s.IsLive && s.EndedAt != null)
-                .OrderByDescending(s => s.EndedAt)
+                .Where(s => s.ChannelId == channel.Id)
+                .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
                 .FirstOrDefaultAsync();
 
             if (stream == null)
             {
-                _logger.LogWarning("on_record_done received but no ended stream found for channel {ChannelId}.", channel.Id);
+                _logger.LogWarning("on_record_done received but no stream found for channel {ChannelId}.", channel.Id);
                 return;
             }
 
-            // Extract just the file name from the full path
+            // Pure string parsing: extract the filename reported by NGINX over HTTP
+            // No local disk/file dependencies — works anywhere (Docker, cloud, separate servers)
             stream.RecordingFileName = System.IO.Path.GetFileName(filePath);
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "Recording saved for stream {StreamId}: {FileName}",
+                "Recording saved for stream {StreamId}: {FileName} (from NGINX webhook)",
                 stream.Id, stream.RecordingFileName);
         }
 

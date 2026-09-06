@@ -435,3 +435,7 @@ appsettings.*.json
 
 # Streaming Server
 StreamingServer/
+
+# Local Test Files
+test-chat.html
+test-*.html
