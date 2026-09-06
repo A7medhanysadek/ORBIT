@@ -10,7 +10,7 @@ namespace OrbitBackend.Data.Seeding
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
 
-            string[] roles = { "Admin", "Streamer" };
+            string[] roles = { "Admin", "Streamer", "Moderator" };
 
             foreach (var role in roles)
             {

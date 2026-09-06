@@ -15,7 +15,13 @@ namespace OrbitBackend.Configuration
             services.AddScoped<IMailService, MailService>();
             services.AddScoped<IStreamService, StreamService>();
             services.AddScoped<IChatService, ChatService>();
+            services.AddScoped<IChannelService, ChannelService>();
+            services.AddScoped<IModerationService, ModerationService>();
             services.AddSingleton<IMediaServerConfigService, MediaServerConfigService>();
+            services.AddSingleton<ViewerTracker>();
+
+            // Background service for auto-ending disconnected streams after grace period
+            services.AddHostedService<StreamGracePeriodService>();
 
             return services;
         }

@@ -35,6 +35,17 @@ namespace OrbitBackend.Models
         /// </summary>
         public double StreamOffsetSeconds { get; set; }
 
+        /// <summary>
+        /// Soft-delete flag. Messages deleted by moderators are hidden but not removed.
+        /// </summary>
+        public bool IsDeleted { get; set; }
+
+        /// <summary>
+        /// The user ID of the moderator/streamer who deleted this message.
+        /// Null if the message has not been deleted.
+        /// </summary>
+        public string? DeletedByUserId { get; set; }
+
         // ── Navigation properties ──
         public LiveStream LiveStream { get; set; } = null!;
         public AppUser Sender { get; set; } = null!;

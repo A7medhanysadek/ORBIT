@@ -47,15 +47,20 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.EmailConfirmed, opt => opt.MapFrom(src => src.EmailConfirmed))
                 .ForMember(dest => dest.Roles, opt => opt.Ignore());
 
-            
             CreateMap<LiveStream, StreamResponseDto>()
                 .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
-                .ForMember(dest => dest.HlsUrl, opt => opt.Ignore());
+                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel.ChannelName))
+                .ForMember(dest => dest.ChannelId, opt => opt.MapFrom(src => src.ChannelId))
+                .ForMember(dest => dest.HlsUrl, opt => opt.Ignore())
+                .ForMember(dest => dest.VodUrl, opt => opt.Ignore())
+                .ForMember(dest => dest.ViewerCount, opt => opt.Ignore());
 
             CreateMap<LiveStream, LiveStreamSummaryDto>()
                 .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
-                .ForMember(dest => dest.HlsUrl, opt => opt.Ignore());
+                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel.ChannelName))
+                .ForMember(dest => dest.HlsUrl, opt => opt.Ignore())
+                .ForMember(dest => dest.IsReconnecting, opt => opt.Ignore())
+                .ForMember(dest => dest.ViewerCount, opt => opt.Ignore());
         }
     }
 }
-

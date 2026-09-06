@@ -9,9 +9,12 @@ namespace OrbitBackend.Models
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiryTime { get; set; }
 
-        
-        public string? StreamKey { get; set; }
+        // ── Channel (one-to-one, nullable — only if user has created a channel) ──
+        public Channel? Channel { get; set; }
+
+        // ── Collections ──
         public ICollection<LiveStream> LiveStreams { get; set; } = new List<LiveStream>();
         public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
+        public ICollection<ChannelModerator> ModeratorOf { get; set; } = new List<ChannelModerator>();
     }
 }

@@ -6,7 +6,18 @@ namespace OrbitBackend.DTOs.Streaming
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
         public string StreamerName { get; set; } = string.Empty;
+        public string? ChannelName { get; set; }
         public string? HlsUrl { get; set; }
         public DateTime? StartedAt { get; set; }
+
+        /// <summary>
+        /// True when the streamer's RTMP connection dropped but the grace period hasn't expired yet.
+        /// </summary>
+        public bool IsReconnecting { get; set; }
+
+        /// <summary>
+        /// Number of viewers currently watching this stream in real-time.
+        /// </summary>
+        public int ViewerCount { get; set; }
     }
 }

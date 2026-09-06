@@ -60,7 +60,7 @@ namespace OrbitBackend.Services
         public async Task<List<ChatMessageDto>> GetStreamChatAsync(int streamId)
         {
             return await _context.ChatMessages
-                .Where(m => m.LiveStreamId == streamId)
+                .Where(m => m.LiveStreamId == streamId && !m.IsDeleted)
                 .OrderBy(m => m.StreamOffsetSeconds)
                 .Select(m => new ChatMessageDto
                 {
@@ -77,6 +77,7 @@ namespace OrbitBackend.Services
         {
             return await _context.ChatMessages
                 .Where(m => m.LiveStreamId == streamId
+                         && !m.IsDeleted
                          && m.StreamOffsetSeconds >= fromSeconds
                          && m.StreamOffsetSeconds <= toSeconds)
                 .OrderBy(m => m.StreamOffsetSeconds)
