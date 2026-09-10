@@ -17,6 +17,13 @@ namespace OrbitBackend.Configuration
             services.AddScoped<IChatService, ChatService>();
             services.AddScoped<IChannelService, ChannelService>();
             services.AddScoped<IModerationService, ModerationService>();
+            services.AddScoped<ICategoryService, CategoryService>();
+            services.AddScoped<IUserProfileService, UserProfileService>();
+            services.AddScoped<IVodService, VodService>();
+            services.AddScoped<IClipService, ClipService>();
+            services.AddScoped<IDashboardService, DashboardService>();
+            services.AddHttpClient();
+            services.AddSingleton<ICloudinaryService, CloudinaryService>();
             services.AddSingleton<IMediaServerConfigService, MediaServerConfigService>();
             services.AddSingleton<ViewerTracker>();
 

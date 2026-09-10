@@ -9,6 +9,7 @@ namespace OrbitBackend.Controllers
     /// <summary>
     /// Manages channels. Users create a channel to become streamers.
     /// Channel owners can hire and manage moderators.
+    /// Also handles channel customization: profile, photos, social links, donation info.
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
@@ -71,6 +72,8 @@ namespace OrbitBackend.Controllers
             return Ok(result);
         }
 
+        // ── Moderator Management ──
+
         /// <summary>
         /// Hires a moderator for the channel by their username.
         /// Only the channel owner can hire moderators.
@@ -124,6 +127,120 @@ namespace OrbitBackend.Controllers
             return Ok(result);
         }
 
+        // ── Channel Customization ──
+
+        /// <summary>
+        /// Updates channel profile information (description, donation URL/message, save streams toggle).
+        /// </summary>
+        [HttpPut("profile")]
+        [Authorize(Roles = "Streamer")]
+        [ProducesResponseType(typeof(ChannelResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateChannelProfile([FromBody] UpdateChannelProfileDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = GetUserId();
+            var result = await _channelService.UpdateChannelProfileAsync(userId, dto);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Uploads a channel profile photo (avatar). Accepts JPEG, PNG, WebP, GIF (max 5MB).
+        /// </summary>
+        [HttpPost("photo")]
+        [Authorize(Roles = "Streamer")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ChannelResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UploadChannelPhoto(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var userId = GetUserId();
+            var result = await _channelService.UploadChannelPhotoAsync(userId, file);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Uploads a channel cover/banner image. Accepts JPEG, PNG, WebP, GIF (max 5MB).
+        /// </summary>
+        [HttpPost("cover")]
+        [Authorize(Roles = "Streamer")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ChannelResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UploadChannelCover(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var userId = GetUserId();
+            var result = await _channelService.UploadChannelCoverAsync(userId, file);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Sets all social media links for the channel (replaces existing links).
+        /// </summary>
+        [HttpPut("social-links")]
+        [Authorize(Roles = "Streamer")]
+        [ProducesResponseType(typeof(List<ChannelSocialLinkDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateSocialLinks([FromBody] UpdateChannelSocialLinksDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = GetUserId();
+            var result = await _channelService.UpdateSocialLinksAsync(userId, dto);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Gets social media links for any channel by its ID.
+        /// </summary>
+        [HttpGet("{id:int}/social-links")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(List<ChannelSocialLinkDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetSocialLinks(int id)
+        {
+            var result = await _channelService.GetSocialLinksAsync(id);
+            return Ok(result);
+        }
+
+        // ── Save Streams Toggle ──
+
+        /// <summary>
+        /// Toggles whether ended streams are saved as VODs for this channel.
+        /// </summary>
+        [HttpPut("save-streams")]
+        [Authorize(Roles = "Streamer")]
+        [ProducesResponseType(typeof(ChannelResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ToggleSaveStreams([FromBody] ToggleSaveStreamsDto dto)
+        {
+            var userId = GetUserId();
+            var result = await _channelService.UpdateChannelProfileAsync(userId, new UpdateChannelProfileDto
+            {
+                SaveStreams = dto.SaveStreams
+            });
+            return Ok(result);
+        }
+
         private string GetUserId()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -134,5 +251,13 @@ namespace OrbitBackend.Controllers
 
             return userId;
         }
+    }
+
+    /// <summary>
+    /// Simple DTO for the save-streams toggle endpoint.
+    /// </summary>
+    public class ToggleSaveStreamsDto
+    {
+        public bool SaveStreams { get; set; }
     }
 }

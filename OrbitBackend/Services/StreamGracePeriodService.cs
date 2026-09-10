@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using OrbitBackend.Data;
+using OrbitBackend.Hubs;
 
 namespace OrbitBackend.Services
 {
@@ -15,6 +17,8 @@ namespace OrbitBackend.Services
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IConfiguration _config;
+        private readonly ViewerTracker _viewerTracker;
+        private readonly IHubContext<StreamChatHub> _hubContext;
         private readonly ILogger<StreamGracePeriodService> _logger;
 
         private const int CheckIntervalSeconds = 30;
@@ -22,10 +26,14 @@ namespace OrbitBackend.Services
         public StreamGracePeriodService(
             IServiceScopeFactory scopeFactory,
             IConfiguration config,
+            ViewerTracker viewerTracker,
+            IHubContext<StreamChatHub> hubContext,
             ILogger<StreamGracePeriodService> logger)
         {
             _scopeFactory = scopeFactory;
             _config = config;
+            _viewerTracker = viewerTracker;
+            _hubContext = hubContext;
             _logger = logger;
         }
 
@@ -58,6 +66,7 @@ namespace OrbitBackend.Services
 
             // Find streams that are still marked live but disconnected beyond the grace period
             var expiredStreams = await context.LiveStreams
+                .Include(s => s.Channel)
                 .Where(s => s.IsLive
                          && s.DisconnectedAt != null
                          && s.DisconnectedAt <= cutoff)
@@ -71,10 +80,33 @@ namespace OrbitBackend.Services
                 stream.IsLive = false;
                 stream.EndedAt = DateTime.UtcNow;
 
+                // Record peak viewers
+                var peak = _viewerTracker.GetPeakViewerCount(stream.Id);
+                stream.PeakViewers = Math.Max(stream.PeakViewers, peak);
+
+                // Auto-assign recording file if channel has SaveStreams enabled
+                if (stream.Channel != null && stream.Channel.SaveStreams && string.IsNullOrEmpty(stream.RecordingFileName))
+                {
+                    stream.RecordingFileName = $"{stream.Channel.StreamKey}.flv";
+                }
+
+                // Notify viewers via SignalR
+                try
+                {
+                    await _hubContext.Clients.Group($"stream_{stream.Id}").SendAsync("StreamEnded", stream.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to broadcast StreamEnded event for stream {StreamId}", stream.Id);
+                }
+
+                // Clean up viewer tracker
+                _viewerTracker.ClearStream(stream.Id);
+
                 _logger.LogInformation(
                     "Stream {StreamId} auto-ended after grace period expired. " +
-                    "Disconnected at {DisconnectedAt}, grace period {GracePeriod}s.",
-                    stream.Id, stream.DisconnectedAt, gracePeriodSeconds);
+                    "Disconnected at {DisconnectedAt}, grace period {GracePeriod}s, peak viewers {Peak}.",
+                    stream.Id, stream.DisconnectedAt, gracePeriodSeconds, stream.PeakViewers);
             }
 
             await context.SaveChangesAsync();

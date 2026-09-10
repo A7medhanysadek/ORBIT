@@ -10,13 +10,15 @@ namespace OrbitBackend.Services
     
     public class MediaServerConfigService : IMediaServerConfigService
     {
+        private readonly IConfiguration _config;
         private readonly ILogger<MediaServerConfigService> _logger;
         private readonly object _lock = new();
         private string? _rtmpUrl;
         private string? _hlsBaseUrl;
 
-        public MediaServerConfigService(ILogger<MediaServerConfigService> logger)
+        public MediaServerConfigService(IConfiguration config, ILogger<MediaServerConfigService> logger)
         {
+            _config = config;
             _logger = logger;
         }
 
@@ -33,7 +35,6 @@ namespace OrbitBackend.Services
 
         public MediaServerConfigDto SetUrls(string rtmpUrl, string hlsBaseUrl)
         {
-            
             rtmpUrl = rtmpUrl.TrimEnd('/');
             hlsBaseUrl = hlsBaseUrl.TrimEnd('/');
 
@@ -74,7 +75,7 @@ namespace OrbitBackend.Services
         {
             lock (_lock)
             {
-                return _rtmpUrl ?? "rtmp://localhost:1935/live";
+                return _rtmpUrl ?? _config["Streaming:RtmpServerUrl"] ?? "rtmp://localhost:1935/live";
             }
         }
 
@@ -82,8 +83,48 @@ namespace OrbitBackend.Services
         {
             lock (_lock)
             {
-                return _hlsBaseUrl ?? "http://localhost:8080/hls";
+                return _hlsBaseUrl ?? _config["Streaming:HlsBaseUrl"] ?? "http://localhost:8080/hls";
             }
+        }
+
+        public string GetControlUrl()
+        {
+            var configured = _config["Streaming:MediaServerControlUrl"];
+            if (!string.IsNullOrEmpty(configured))
+                return configured.TrimEnd('/');
+
+            var hlsBase = GetHlsBaseUrl();
+            return hlsBase.Replace("/hls", "/control");
+        }
+
+        public string GetClipServiceUrl()
+        {
+            var configured = _config["Streaming:MediaServerClipUrl"];
+            if (!string.IsNullOrEmpty(configured))
+                return configured.TrimEnd('/');
+
+            var hlsBase = GetHlsBaseUrl();
+            return hlsBase.Replace("/hls", "/api/clip");
+        }
+
+        public string GetClipsBaseUrl()
+        {
+            var configured = _config["Streaming:ClipsBaseUrl"];
+            if (!string.IsNullOrEmpty(configured))
+                return configured.TrimEnd('/');
+
+            var hlsBase = GetHlsBaseUrl();
+            return hlsBase.Replace("/hls", "/clips");
+        }
+
+        public string GetRecordingsBaseUrl()
+        {
+            var configured = _config["Streaming:RecordingsBaseUrl"];
+            if (!string.IsNullOrEmpty(configured))
+                return configured.TrimEnd('/');
+
+            var hlsBase = GetHlsBaseUrl();
+            return hlsBase.Replace("/hls", "/recordings");
         }
 
         private MediaServerConfigDto BuildConfigDto(string message)

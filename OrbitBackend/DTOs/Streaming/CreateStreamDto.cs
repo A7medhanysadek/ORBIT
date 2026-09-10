@@ -10,5 +10,10 @@ namespace OrbitBackend.DTOs.Streaming
 
         [MaxLength(1000)]
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Optional category for this stream (e.g., Gaming, Music).
+        /// </summary>
+        public int? CategoryId { get; set; }
     }
 }

@@ -43,6 +43,8 @@ namespace OrbitBackend
                 await RoleSeeder.SeedRolesAsync(scope.ServiceProvider);
             }
 
+            await CategorySeeder.SeedCategoriesAsync(app.Services);
+
             app.UseMiddleware<ExceptionHandlingMiddleware>();
 
             app.UseSwagger();

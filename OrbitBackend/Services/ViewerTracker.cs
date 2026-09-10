@@ -5,6 +5,7 @@ namespace OrbitBackend.Services
     /// <summary>
     /// Thread-safe in-memory tracker for real-time viewer counts per stream.
     /// Uses SignalR connection tracking — viewers are counted when they join/leave stream groups.
+    /// Also records peak concurrent viewers for each stream session.
     /// 
     /// Registered as a Singleton so all SignalR hub instances and controllers share the same state.
     /// </summary>
@@ -13,13 +14,19 @@ namespace OrbitBackend.Services
         // streamId → set of connectionIds
         private readonly ConcurrentDictionary<int, ConcurrentDictionary<string, byte>> _viewers = new();
 
+        // streamId → peak concurrent viewer count
+        private readonly ConcurrentDictionary<int, int> _peakViewers = new();
+
         /// <summary>
-        /// Adds a viewer (connection) to a stream.
+        /// Adds a viewer (connection) to a stream and updates the peak viewer count.
         /// </summary>
         public void AddViewer(int streamId, string connectionId)
         {
             var connections = _viewers.GetOrAdd(streamId, _ => new ConcurrentDictionary<string, byte>());
             connections.TryAdd(connectionId, 0);
+
+            var count = connections.Count;
+            _peakViewers.AddOrUpdate(streamId, count, (_, oldPeak) => Math.Max(oldPeak, count));
         }
 
         /// <summary>
@@ -58,6 +65,25 @@ namespace OrbitBackend.Services
             return _viewers.TryGetValue(streamId, out var connections)
                 ? connections.Count
                 : 0;
+        }
+
+        /// <summary>
+        /// Gets the peak concurrent viewer count recorded for a stream.
+        /// </summary>
+        public int GetPeakViewerCount(int streamId)
+        {
+            return _peakViewers.TryGetValue(streamId, out var peak)
+                ? peak
+                : GetViewerCount(streamId);
+        }
+
+        /// <summary>
+        /// Clears tracking data for an ended stream.
+        /// </summary>
+        public void ClearStream(int streamId)
+        {
+            _viewers.TryRemove(streamId, out _);
+            _peakViewers.TryRemove(streamId, out _);
         }
 
         /// <summary>

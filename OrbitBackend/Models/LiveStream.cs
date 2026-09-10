@@ -23,13 +23,32 @@ namespace OrbitBackend.Models
         /// </summary>
         public string? RecordingFileName { get; set; }
 
+        /// <summary>
+        /// Stream thumbnail image URL (Cloudinary).
+        /// </summary>
+        public string? ThumbnailUrl { get; set; }
+
         // ── Foreign Keys ──
         public string StreamerId { get; set; } = string.Empty;
         public int ChannelId { get; set; }
 
+        /// <summary>
+        /// Optional category for this stream (e.g., "Gaming", "Just Chatting").
+        /// </summary>
+        public int? CategoryId { get; set; }
+
+        /// <summary>
+        /// Peak concurrent viewers achieved during this stream session.
+        /// </summary>
+        public int PeakViewers { get; set; } = 0;
+
         // ── Navigation Properties ──
         public AppUser Streamer { get; set; } = null!;
         public Channel Channel { get; set; } = null!;
+        public Category? Category { get; set; }
         public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
+        public ICollection<VodView> VodViews { get; set; } = new List<VodView>();
+        public ICollection<Clip> Clips { get; set; } = new List<Clip>();
     }
 }
+

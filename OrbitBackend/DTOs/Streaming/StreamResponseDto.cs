@@ -7,6 +7,7 @@ namespace OrbitBackend.DTOs.Streaming
         public string? Description { get; set; }
         public bool IsLive { get; set; }
         public string? HlsUrl { get; set; }
+        public string? ThumbnailUrl { get; set; }
 
         /// <summary>
         /// URL to the recorded stream video for VOD playback. 
@@ -32,5 +33,10 @@ namespace OrbitBackend.DTOs.Streaming
         public DateTime? StartedAt { get; set; }
         public DateTime? EndedAt { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        // ── Category ──
+        public int? CategoryId { get; set; }
+        public string? CategoryName { get; set; }
+        public string? CategorySlug { get; set; }
     }
 }

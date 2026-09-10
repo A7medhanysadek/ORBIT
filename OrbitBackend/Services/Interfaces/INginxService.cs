@@ -28,14 +28,16 @@ namespace OrbitBackend.Services.Interfaces
         
         string GetRtmpUrl();
 
-        
-        
-        
         string GetHlsBaseUrl();
 
-        
-        
-        
+        string GetControlUrl();
+
+        string GetClipServiceUrl();
+
+        string GetClipsBaseUrl();
+
+        string GetRecordingsBaseUrl();
+
         bool IsConfigured { get; }
     }
 }

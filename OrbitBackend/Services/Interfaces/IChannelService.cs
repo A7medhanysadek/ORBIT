@@ -35,5 +35,32 @@ namespace OrbitBackend.Services.Interfaces
         /// Lists all moderators for the channel owned by the given user.
         /// </summary>
         Task<List<ChannelModeratorDto>> GetModeratorsAsync(string ownerUserId);
+
+        // ── Channel Customization ──
+
+        /// <summary>
+        /// Updates channel profile info (description, donation, saveStreams).
+        /// </summary>
+        Task<ChannelResponseDto> UpdateChannelProfileAsync(string userId, UpdateChannelProfileDto dto);
+
+        /// <summary>
+        /// Uploads a channel profile photo (avatar) to Cloudinary.
+        /// </summary>
+        Task<ChannelResponseDto> UploadChannelPhotoAsync(string userId, IFormFile file);
+
+        /// <summary>
+        /// Uploads a channel cover/banner image to Cloudinary.
+        /// </summary>
+        Task<ChannelResponseDto> UploadChannelCoverAsync(string userId, IFormFile file);
+
+        /// <summary>
+        /// Replaces all social links for the user's channel.
+        /// </summary>
+        Task<List<ChannelSocialLinkDto>> UpdateSocialLinksAsync(string userId, UpdateChannelSocialLinksDto dto);
+
+        /// <summary>
+        /// Gets social links for any channel by ID.
+        /// </summary>
+        Task<List<ChannelSocialLinkDto>> GetSocialLinksAsync(int channelId);
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OrbitBackend.DTOs.Dashboard;
 using OrbitBackend.DTOs.Streaming;
 using OrbitBackend.Services.Interfaces;
 using System.Security.Claims;
@@ -79,17 +80,40 @@ namespace OrbitBackend.Controllers
         
         
         
+        /// <summary>
+        /// Updates the current live stream's category, title, or description while streaming.
+        /// Broadcasts real-time SignalR notification to viewers.
+        /// </summary>
+        [HttpPatch("current")]
+        [Authorize(Roles = "Streamer")]
+        [ProducesResponseType(typeof(StreamResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateCurrentStream([FromBody] UpdateLiveStreamDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = GetUserId();
+            var result = await _streamService.UpdateStreamAsync(userId, dto);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Manually ends the active or pending stream, disconnects RTMP, and cleans up tracking.
+        /// </summary>
         [HttpPost("end")]
         [Authorize(Roles = "Streamer")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(StreamSessionSummaryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> EndStream()
         {
             var userId = GetUserId();
-            await _streamService.EndStreamAsync(userId);
-            return Ok(new { message = "Stream ended successfully." });
+            var summary = await _streamService.EndStreamAsync(userId);
+            return Ok(summary);
         }
 
         

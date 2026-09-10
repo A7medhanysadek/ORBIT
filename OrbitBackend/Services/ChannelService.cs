@@ -12,17 +12,20 @@ namespace OrbitBackend.Services
         private readonly AppDbContext _context;
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly ICloudinaryService _cloudinaryService;
         private readonly ILogger<ChannelService> _logger;
 
         public ChannelService(
             AppDbContext context,
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
+            ICloudinaryService cloudinaryService,
             ILogger<ChannelService> logger)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
+            _cloudinaryService = cloudinaryService;
             _logger = logger;
         }
 
@@ -75,6 +78,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Owner)
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
+                .Include(c => c.SocialLinks)
                 .FirstOrDefaultAsync(c => c.Id == channelId)
                 ?? throw new InvalidOperationException("Channel not found.");
 
@@ -87,6 +91,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Owner)
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
+                .Include(c => c.SocialLinks)
                 .FirstOrDefaultAsync(c => c.OwnerId == userId)
                 ?? throw new InvalidOperationException("You don't have a channel. Create one first using POST /api/channel/create.");
 
@@ -189,6 +194,137 @@ namespace OrbitBackend.Services
                 .ToListAsync();
         }
 
+        // ── Channel Customization ──
+
+        public async Task<ChannelResponseDto> UpdateChannelProfileAsync(string userId, UpdateChannelProfileDto dto)
+        {
+            var channel = await _context.Channels
+                .Include(c => c.Owner)
+                .Include(c => c.Moderators)
+                .Include(c => c.LiveStreams)
+                .Include(c => c.SocialLinks)
+                .FirstOrDefaultAsync(c => c.OwnerId == userId)
+                ?? throw new InvalidOperationException("You don't have a channel.");
+
+            if (dto.Description != null)
+                channel.Description = dto.Description;
+
+            if (dto.DonationUrl != null)
+                channel.DonationUrl = dto.DonationUrl;
+
+            if (dto.DonationMessage != null)
+                channel.DonationMessage = dto.DonationMessage;
+
+            if (dto.SaveStreams.HasValue)
+                channel.SaveStreams = dto.SaveStreams.Value;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Channel {ChannelId} profile updated by user {UserId}.", channel.Id, userId);
+
+            return MapToResponseDto(channel, channel.Owner);
+        }
+
+        public async Task<ChannelResponseDto> UploadChannelPhotoAsync(string userId, IFormFile file)
+        {
+            var channel = await _context.Channels
+                .Include(c => c.Owner)
+                .Include(c => c.Moderators)
+                .Include(c => c.LiveStreams)
+                .Include(c => c.SocialLinks)
+                .FirstOrDefaultAsync(c => c.OwnerId == userId)
+                ?? throw new InvalidOperationException("You don't have a channel.");
+
+            // Delete old photo if exists
+            if (!string.IsNullOrEmpty(channel.ProfilePhotoUrl))
+            {
+                var oldPublicId = _cloudinaryService.GetPublicIdFromUrl(channel.ProfilePhotoUrl);
+                if (!string.IsNullOrEmpty(oldPublicId))
+                    await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            var url = await _cloudinaryService.UploadImageAsync(file, "orbit/channel-photos");
+            channel.ProfilePhotoUrl = url;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Channel {ChannelId} profile photo updated.", channel.Id);
+
+            return MapToResponseDto(channel, channel.Owner);
+        }
+
+        public async Task<ChannelResponseDto> UploadChannelCoverAsync(string userId, IFormFile file)
+        {
+            var channel = await _context.Channels
+                .Include(c => c.Owner)
+                .Include(c => c.Moderators)
+                .Include(c => c.LiveStreams)
+                .Include(c => c.SocialLinks)
+                .FirstOrDefaultAsync(c => c.OwnerId == userId)
+                ?? throw new InvalidOperationException("You don't have a channel.");
+
+            // Delete old cover if exists
+            if (!string.IsNullOrEmpty(channel.CoverPhotoUrl))
+            {
+                var oldPublicId = _cloudinaryService.GetPublicIdFromUrl(channel.CoverPhotoUrl);
+                if (!string.IsNullOrEmpty(oldPublicId))
+                    await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            var url = await _cloudinaryService.UploadImageAsync(file, "orbit/channel-covers");
+            channel.CoverPhotoUrl = url;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Channel {ChannelId} cover photo updated.", channel.Id);
+
+            return MapToResponseDto(channel, channel.Owner);
+        }
+
+        public async Task<List<ChannelSocialLinkDto>> UpdateSocialLinksAsync(string userId, UpdateChannelSocialLinksDto dto)
+        {
+            var channel = await _context.Channels
+                .Include(c => c.SocialLinks)
+                .FirstOrDefaultAsync(c => c.OwnerId == userId)
+                ?? throw new InvalidOperationException("You don't have a channel.");
+
+            // Remove existing links
+            _context.ChannelSocialLinks.RemoveRange(channel.SocialLinks);
+
+            // Add new links
+            var newLinks = dto.SocialLinks.Select(sl => new ChannelSocialLink
+            {
+                ChannelId = channel.Id,
+                Platform = sl.Platform.ToLower().Trim(),
+                Url = sl.Url.Trim()
+            }).ToList();
+
+            _context.ChannelSocialLinks.AddRange(newLinks);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Channel {ChannelId} social links updated ({Count} links).", channel.Id, newLinks.Count);
+
+            return newLinks.Select(sl => new ChannelSocialLinkDto
+            {
+                Platform = sl.Platform,
+                Url = sl.Url
+            }).ToList();
+        }
+
+        public async Task<List<ChannelSocialLinkDto>> GetSocialLinksAsync(int channelId)
+        {
+            var exists = await _context.Channels.AnyAsync(c => c.Id == channelId);
+            if (!exists)
+                throw new InvalidOperationException("Channel not found.");
+
+            return await _context.ChannelSocialLinks
+                .Where(sl => sl.ChannelId == channelId)
+                .Select(sl => new ChannelSocialLinkDto
+                {
+                    Platform = sl.Platform,
+                    Url = sl.Url
+                })
+                .ToListAsync();
+        }
+
         private static ChannelResponseDto MapToResponseDto(Channel channel, AppUser owner)
         {
             return new ChannelResponseDto
@@ -198,9 +334,20 @@ namespace OrbitBackend.Services
                 Description = channel.Description,
                 OwnerId = owner.Id,
                 OwnerName = owner.FullName,
+                OwnerProfilePictureUrl = owner.ProfilePictureUrl,
                 CreatedAt = channel.CreatedAt,
                 IsLive = channel.LiveStreams?.Any(s => s.IsLive) ?? false,
-                ModeratorCount = channel.Moderators?.Count ?? 0
+                ModeratorCount = channel.Moderators?.Count ?? 0,
+                ProfilePhotoUrl = channel.ProfilePhotoUrl,
+                CoverPhotoUrl = channel.CoverPhotoUrl,
+                DonationUrl = channel.DonationUrl,
+                DonationMessage = channel.DonationMessage,
+                SaveStreams = channel.SaveStreams,
+                SocialLinks = channel.SocialLinks?.Select(sl => new ChannelSocialLinkDto
+                {
+                    Platform = sl.Platform,
+                    Url = sl.Url
+                }).ToList() ?? new()
             };
         }
     }

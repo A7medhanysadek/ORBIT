@@ -204,6 +204,9 @@ namespace OrbitBackend.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RefreshToken")
                         .HasColumnType("nvarchar(max)");
 
@@ -233,6 +236,39 @@ namespace OrbitBackend.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("OrbitBackend.Models.Category", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("Categories");
+                });
+
             modelBuilder.Entity("OrbitBackend.Models.Channel", b =>
                 {
                     b.Property<int>("Id")
@@ -246,6 +282,10 @@ namespace OrbitBackend.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("CoverPhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -253,9 +293,24 @@ namespace OrbitBackend.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("DonationMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("DonationUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("OwnerId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProfilePhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("SaveStreams")
+                        .HasColumnType("bit");
 
                     b.Property<string>("StreamKey")
                         .HasColumnType("nvarchar(450)");
@@ -291,6 +346,34 @@ namespace OrbitBackend.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("ChannelModerators");
+                });
+
+            modelBuilder.Entity("OrbitBackend.Models.ChannelSocialLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChannelId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
+
+                    b.ToTable("ChannelSocialLinks");
                 });
 
             modelBuilder.Entity("OrbitBackend.Models.ChatBan", b =>
@@ -421,6 +504,71 @@ namespace OrbitBackend.Migrations
                     b.ToTable("ChatTimeouts");
                 });
 
+            modelBuilder.Entity("OrbitBackend.Models.Clip", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ChannelId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatorId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<double>("DurationSeconds")
+                        .HasColumnType("float");
+
+                    b.Property<int?>("LiveStreamId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("VideoUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ViewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("CreatorId");
+
+                    b.HasIndex("LiveStreamId");
+
+                    b.HasIndex("ViewCount");
+
+                    b.HasIndex("CategoryId", "ViewCount");
+
+                    b.ToTable("Clips");
+                });
+
             modelBuilder.Entity("OrbitBackend.Models.LiveStream", b =>
                 {
                     b.Property<int>("Id")
@@ -428,6 +576,9 @@ namespace OrbitBackend.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
 
                     b.Property<int>("ChannelId")
                         .HasColumnType("int");
@@ -448,6 +599,11 @@ namespace OrbitBackend.Migrations
                     b.Property<bool>("IsLive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("PeakViewers")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("RecordingFileName")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -459,6 +615,10 @@ namespace OrbitBackend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("ThumbnailUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -466,13 +626,49 @@ namespace OrbitBackend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.HasIndex("ChannelId");
 
                     b.HasIndex("IsLive");
 
+                    b.HasIndex("PeakViewers");
+
                     b.HasIndex("StreamerId");
 
                     b.ToTable("LiveStreams");
+                });
+
+            modelBuilder.Entity("OrbitBackend.Models.VodView", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("LiveStreamId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("ViewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("LiveStreamId", "SessionId");
+
+                    b.HasIndex("LiveStreamId", "UserId");
+
+                    b.ToTable("VodViews");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -556,6 +752,17 @@ namespace OrbitBackend.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("OrbitBackend.Models.ChannelSocialLink", b =>
+                {
+                    b.HasOne("OrbitBackend.Models.Channel", "Channel")
+                        .WithMany("SocialLinks")
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+                });
+
             modelBuilder.Entity("OrbitBackend.Models.ChatBan", b =>
                 {
                     b.HasOne("OrbitBackend.Models.Channel", "Channel")
@@ -629,8 +836,46 @@ namespace OrbitBackend.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("OrbitBackend.Models.Clip", b =>
+                {
+                    b.HasOne("OrbitBackend.Models.Category", "Category")
+                        .WithMany("Clips")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("OrbitBackend.Models.Channel", "Channel")
+                        .WithMany("Clips")
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OrbitBackend.Models.AppUser", "Creator")
+                        .WithMany("CreatedClips")
+                        .HasForeignKey("CreatorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("OrbitBackend.Models.LiveStream", "LiveStream")
+                        .WithMany("Clips")
+                        .HasForeignKey("LiveStreamId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Channel");
+
+                    b.Navigation("Creator");
+
+                    b.Navigation("LiveStream");
+                });
+
             modelBuilder.Entity("OrbitBackend.Models.LiveStream", b =>
                 {
+                    b.HasOne("OrbitBackend.Models.Category", "Category")
+                        .WithMany("LiveStreams")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("OrbitBackend.Models.Channel", "Channel")
                         .WithMany("LiveStreams")
                         .HasForeignKey("ChannelId")
@@ -643,9 +888,29 @@ namespace OrbitBackend.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.Navigation("Category");
+
                     b.Navigation("Channel");
 
                     b.Navigation("Streamer");
+                });
+
+            modelBuilder.Entity("OrbitBackend.Models.VodView", b =>
+                {
+                    b.HasOne("OrbitBackend.Models.LiveStream", "LiveStream")
+                        .WithMany("VodViews")
+                        .HasForeignKey("LiveStreamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OrbitBackend.Models.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("LiveStream");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OrbitBackend.Models.AppUser", b =>
@@ -654,21 +919,38 @@ namespace OrbitBackend.Migrations
 
                     b.Navigation("ChatMessages");
 
+                    b.Navigation("CreatedClips");
+
                     b.Navigation("LiveStreams");
 
                     b.Navigation("ModeratorOf");
                 });
 
+            modelBuilder.Entity("OrbitBackend.Models.Category", b =>
+                {
+                    b.Navigation("Clips");
+
+                    b.Navigation("LiveStreams");
+                });
+
             modelBuilder.Entity("OrbitBackend.Models.Channel", b =>
                 {
+                    b.Navigation("Clips");
+
                     b.Navigation("LiveStreams");
 
                     b.Navigation("Moderators");
+
+                    b.Navigation("SocialLinks");
                 });
 
             modelBuilder.Entity("OrbitBackend.Models.LiveStream", b =>
                 {
                     b.Navigation("ChatMessages");
+
+                    b.Navigation("Clips");
+
+                    b.Navigation("VodViews");
                 });
 #pragma warning restore 612, 618
         }
