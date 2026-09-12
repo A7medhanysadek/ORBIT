@@ -16,6 +16,7 @@ namespace OrbitBackend.Data
         public DbSet<ChannelSocialLink> ChannelSocialLinks { get; set; }
         public DbSet<VodView> VodViews { get; set; }
         public DbSet<Clip> Clips { get; set; }
+        public DbSet<ChannelEmoji> ChannelEmojis { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
@@ -179,6 +180,9 @@ namespace OrbitBackend.Data
                     .IsRequired()
                     .HasMaxLength(100);
 
+                entity.Property(e => e.SenderBadge)
+                    .HasMaxLength(10);
+
                 entity.Property(e => e.SenderId)
                     .IsRequired();
 
@@ -323,6 +327,31 @@ namespace OrbitBackend.Data
                 entity.HasIndex(e => e.ViewCount);
                 entity.HasIndex(e => e.CreatedAt);
                 entity.HasIndex(e => new { e.CategoryId, e.ViewCount });
+            });
+
+            // ── ChannelEmoji ──
+            builder.Entity<ChannelEmoji>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(32);
+
+                entity.Property(e => e.EmojiValue)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.HasOne(e => e.Channel)
+                    .WithMany(c => c.CustomEmojis)
+                    .HasForeignKey(e => e.ChannelId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Unique emoji name per channel
+                entity.HasIndex(e => new { e.ChannelId, e.Name })
+                    .IsUnique();
+
+                entity.HasIndex(e => e.ChannelId);
             });
         }
     }

@@ -63,6 +63,7 @@ namespace OrbitBackend.Models
         public ICollection<ChannelModerator> Moderators { get; set; } = new List<ChannelModerator>();
         public ICollection<ChannelSocialLink> SocialLinks { get; set; } = new List<ChannelSocialLink>();
         public ICollection<Clip> Clips { get; set; } = new List<Clip>();
+        public ICollection<ChannelEmoji> CustomEmojis { get; set; } = new List<ChannelEmoji>();
     }
 }
 

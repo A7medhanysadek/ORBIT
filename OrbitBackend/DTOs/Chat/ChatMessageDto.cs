@@ -4,6 +4,12 @@ namespace OrbitBackend.DTOs.Chat
     {
         public long Id { get; set; }
         public string SenderName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Role badge emoji: 🌍 = channel owner, 🪐 = moderator, ⭐ = OG user, null = regular.
+        /// </summary>
+        public string? SenderBadge { get; set; }
+
         public string Content { get; set; } = string.Empty;
         public DateTime SentAt { get; set; }
 

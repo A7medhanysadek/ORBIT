@@ -142,17 +142,48 @@ namespace OrbitBackend.Controllers
         }
 
         /// <summary>
-        /// Regenerates the streamer's RTMP stream key.
+        /// Sets (replaces all) custom emojis for the streamer's channel chat.
+        /// Maximum 50 custom emojis per channel.
         /// </summary>
-        [HttpPost("stream-key/regenerate")]
-        [ProducesResponseType(typeof(StreamKeyResponseDto), StatusCodes.Status200OK)]
+        [HttpPut("emojis/custom")]
+        [ProducesResponseType(typeof(List<CustomEmojiResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> RegenerateStreamKey()
+        public async Task<IActionResult> SetCustomEmojis([FromBody] SetCustomEmojisDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = GetUserId();
+            var result = await _dashboardService.SetCustomEmojisAsync(userId, dto);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Gets all custom emojis for the streamer's channel.
+        /// </summary>
+        [HttpGet("emojis/custom")]
+        [ProducesResponseType(typeof(List<CustomEmojiResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetCustomEmojis()
         {
             var userId = GetUserId();
-            var result = await _dashboardService.RegenerateStreamKeyAsync(userId);
+            var result = await _dashboardService.GetCustomEmojisAsync(userId);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Gets the platform badge emoji configuration (owner 🌍, moderator 🪐, OG ⭐).
+        /// </summary>
+        [HttpGet("emojis/badges")]
+        [ProducesResponseType(typeof(BadgeEmojisResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public IActionResult GetBadgeEmojis()
+        {
+            var result = _dashboardService.GetBadgeEmojis();
             return Ok(result);
         }
 

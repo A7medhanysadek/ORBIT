@@ -1,5 +1,6 @@
 using OrbitBackend.DTOs.Dashboard;
 using OrbitBackend.DTOs.Streaming;
+using OrbitBackend.Models;
 
 namespace OrbitBackend.Services.Interfaces
 {
@@ -37,6 +38,12 @@ namespace OrbitBackend.Services.Interfaces
         /// Saves the recording file path received from nginx on_record_done callback.
         /// </summary>
         Task SaveRecordingPathAsync(string streamKey, string filePath);
+
+        /// <summary>
+        /// Finalizes recording for a completed stream session.
+        /// If multiple chunks were recorded across disconnections, merges them into a single recording.
+        /// </summary>
+        Task<string?> FinalizeStreamRecordingAsync(LiveStream stream, Channel channel);
     }
 
     public class MarkLiveResultDto

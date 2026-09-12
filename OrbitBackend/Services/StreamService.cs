@@ -8,6 +8,9 @@ using OrbitBackend.Hubs;
 using OrbitBackend.Models;
 using OrbitBackend.Services.Interfaces;
 using System.Security.Cryptography;
+using System.Diagnostics;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OrbitBackend.Services
 {
@@ -221,6 +224,19 @@ namespace OrbitBackend.Services
                 return true;
             }
 
+            // Allow reconnection during nginx grace period (drop_idle_publisher):
+            // When nginx keeps the session alive, on_publish_done hasn't fired yet,
+            // so the stream is still IsLive with DisconnectedAt == null.
+            // Allow the publisher to re-publish to the same key.
+            var hasActiveStream = await _context.LiveStreams
+                .AnyAsync(s => s.StreamerId == user.Id && s.IsLive && s.DisconnectedAt == null);
+
+            if (hasActiveStream)
+            {
+                _logger.LogInformation("Stream key validated — active stream found (nginx grace period reconnection) for user {UserId}.", user.Id);
+                return true;
+            }
+
             // Check for a pending (created but not yet live) stream
             var hasPendingStream = await _context.LiveStreams
                 .AnyAsync(s => s.StreamerId == user.Id && !s.IsLive && s.EndedAt == null);
@@ -254,6 +270,7 @@ namespace OrbitBackend.Services
             if (disconnectedStream != null)
             {
                 disconnectedStream.DisconnectedAt = null;
+                disconnectedStream.RecordingFileName = null; // Clear old chunk so live stream doesn't hold stale chunk
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation(
@@ -269,7 +286,30 @@ namespace OrbitBackend.Services
                 };
             }
 
-            // Priority 2: Start a new pending stream
+            // Priority 2: Reconnect during nginx grace period (drop_idle_publisher)
+            // on_publish_done hasn't fired yet, stream is still IsLive with no DisconnectedAt
+            var activeStream = await _context.LiveStreams
+                .Include(s => s.Category)
+                .Where(s => s.StreamerId == user.Id && s.IsLive && s.DisconnectedAt == null)
+                .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (activeStream != null)
+            {
+                _logger.LogInformation(
+                    "Stream {StreamId} RECONNECTED (nginx grace period) for user {UserId}. Session continues.",
+                    activeStream.Id, user.Id);
+
+                return new MarkLiveResultDto
+                {
+                    StreamId = activeStream.Id,
+                    Title = activeStream.Title,
+                    CategoryId = activeStream.CategoryId,
+                    CategoryName = activeStream.Category?.Name
+                };
+            }
+
+            // Priority 3: Start a new pending stream
             var pendingStream = await _context.LiveStreams
                 .Include(s => s.Category)
                 .Where(s => s.StreamerId == user.Id && !s.IsLive && s.EndedAt == null)
@@ -338,7 +378,7 @@ namespace OrbitBackend.Services
             var channel = stream.Channel;
             var now = DateTime.UtcNow;
             var startedAt = stream.StartedAt ?? stream.CreatedAt;
-            var durationSeconds = stream.StartedAt.HasValue ? (now - stream.StartedAt.Value).TotalSeconds : 0;
+            var durationSeconds = (now - startedAt).TotalSeconds;
 
             // Save peak viewers
             var peak = _viewerTracker.GetPeakViewerCount(stream.Id);
@@ -348,9 +388,21 @@ namespace OrbitBackend.Services
             if (!string.IsNullOrEmpty(channel.StreamKey))
             {
                 await TryDropNginxPublisherAsync(channel.StreamKey);
-                // Brief pause to allow NGINX on_record_done webhook to be processed
-                await Task.Delay(400);
-                await _context.Entry(stream).ReloadAsync();
+
+                // Wait up to 1500ms for NGINX on_record_done webhook to be processed
+                for (int i = 0; i < 6; i++)
+                {
+                    await Task.Delay(250);
+                    await _context.Entry(stream).ReloadAsync();
+                    if (!string.IsNullOrEmpty(stream.RecordingFileName))
+                        break;
+                }
+
+                // Finalize and merge all session recording chunks into one file
+                if (channel.SaveStreams)
+                {
+                    await FinalizeStreamRecordingAsync(stream, channel);
+                }
             }
 
             stream.IsLive = false;
@@ -464,12 +516,30 @@ namespace OrbitBackend.Services
                 return;
             }
 
+            // If the stream has already ended and already has a finalized/merged recording, don't overwrite it with a late single chunk
+            if (!stream.IsLive && stream.EndedAt != null && !string.IsNullOrEmpty(stream.RecordingFileName) && stream.RecordingFileName.Contains("-merged"))
+            {
+                _logger.LogInformation("Stream {StreamId} already has finalized recording {FileName}. Ignoring late on_record_done.", stream.Id, stream.RecordingFileName);
+                return;
+            }
+
             stream.RecordingFileName = System.IO.Path.GetFileName(filePath);
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
                 "Recording saved for stream {StreamId}: {FileName} (from NGINX webhook)",
                 stream.Id, stream.RecordingFileName);
+        }
+
+        private static long? ExtractRecordingEpoch(string fileName, string streamKey)
+        {
+            var pattern = "^" + Regex.Escape(streamKey) + @"-(\d{9,12})";
+            var match = Regex.Match(fileName, pattern);
+            if (match.Success && long.TryParse(match.Groups[1].Value, out long epoch))
+            {
+                return epoch;
+            }
+            return null;
         }
 
         private async Task TryDropNginxPublisherAsync(string streamKey)
@@ -492,6 +562,243 @@ namespace OrbitBackend.Services
             {
                 _logger.LogWarning(ex, "Could not call NGINX drop publisher control endpoint.");
             }
+        }
+
+        public async Task<string?> FinalizeStreamRecordingAsync(LiveStream stream, Channel channel)
+        {
+            if (!channel.SaveStreams || string.IsNullOrEmpty(channel.StreamKey))
+            {
+                return null;
+            }
+
+            try
+            {
+                var startedUtc = DateTime.SpecifyKind(stream.StartedAt ?? stream.CreatedAt, DateTimeKind.Utc);
+                var endedUtc = DateTime.SpecifyKind(stream.EndedAt ?? DateTime.UtcNow, DateTimeKind.Utc);
+                long sessionStartEpoch = new DateTimeOffset(startedUtc).ToUnixTimeSeconds();
+                long sessionEndEpoch = new DateTimeOffset(endedUtc).ToUnixTimeSeconds();
+
+                // Find candidate recording directory on local disk if available to get precise chunk list
+                var candidateDirs = new[]
+                {
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "nginx", "recordings")
+                };
+
+                DirectoryInfo? recDir = null;
+                foreach (var dir in candidateDirs)
+                {
+                    if (Directory.Exists(dir))
+                    {
+                        recDir = new DirectoryInfo(dir);
+                        break;
+                    }
+                }
+
+                List<FileInfo>? sessionChunks = null;
+                if (recDir != null)
+                {
+                    sessionChunks = recDir.GetFiles($"{channel.StreamKey}*.flv")
+                        .Concat(recDir.GetFiles($"{channel.StreamKey}*.mp4"))
+                        .Where(f => f.Length > 0 && !f.Name.Contains("-merged"))
+                        .Select(f => new
+                        {
+                            File = f,
+                            Epoch = ExtractRecordingEpoch(f.Name, channel.StreamKey) ?? new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeSeconds()
+                        })
+                        .Where(x => x.Epoch >= (sessionStartEpoch - 60) && x.Epoch <= (sessionEndEpoch + 60))
+                        .OrderBy(x => x.Epoch)
+                        .Select(x => x.File)
+                        .ToList();
+                }
+
+                // 1. Attempt to call media server /api/clip/merge
+                var mergeUrl = _mediaServerConfig.GetClipServiceUrl().Replace("/api/clip", "/api/clip/merge");
+                var payload = new
+                {
+                    streamKey = channel.StreamKey,
+                    fileNames = sessionChunks != null && sessionChunks.Count > 0 ? sessionChunks.Select(c => c.Name).ToList() : null,
+                    startTime = startedUtc.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    endTime = endedUtc.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    startEpoch = sessionStartEpoch,
+                    endEpoch = sessionEndEpoch,
+                    deleteSources = true
+                };
+
+                try
+                {
+                    var response = await _httpClient.PostAsJsonAsync(mergeUrl, payload);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<MediaServerMergeResponse>();
+                        if (result != null && result.Success && !string.IsNullOrEmpty(result.MergedFileName))
+                        {
+                            stream.RecordingFileName = result.MergedFileName;
+                            _logger.LogInformation("FinalizeStreamRecording: Media server merged recording for stream {StreamId}: {FileName} (chunks: {Count})",
+                                stream.Id, stream.RecordingFileName, result.FileCount);
+                            return stream.RecordingFileName;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("FinalizeStreamRecording: Media server merge returned status {StatusCode}", response.StatusCode);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "FinalizeStreamRecording: Could not reach media server merge endpoint at {Url}", mergeUrl);
+                }
+
+                // 2. Fallback: Local disk scan and concatenation
+                if (recDir != null && sessionChunks != null)
+                {
+                    if (sessionChunks.Count == 1)
+                    {
+                        stream.RecordingFileName = sessionChunks[0].Name;
+                        _logger.LogInformation("FinalizeStreamRecording: Single recording chunk found on disk for stream {StreamId}: {FileName}", stream.Id, stream.RecordingFileName);
+                        return stream.RecordingFileName;
+                    }
+
+                    if (sessionChunks.Count >= 2)
+                    {
+                        var ffmpegPath = FindLocalFfmpeg();
+                        if (!string.IsNullOrEmpty(ffmpegPath))
+                        {
+                            var outName = $"{Path.GetFileNameWithoutExtension(sessionChunks[0].Name)}-merged{sessionChunks[0].Extension}";
+                            var outPath = Path.Combine(recDir.FullName, outName);
+                            var manifestFileName = $"concat_{stream.Id}_{Guid.NewGuid():N}.txt";
+                            var manifestPath = Path.Combine(recDir.FullName, manifestFileName);
+
+                            try
+                            {
+                                // Write relative basenames without BOM to avoid path encoding issues
+                                var manifestLines = sessionChunks.Select(c => $"file '{c.Name}'");
+                                var utf8NoBom = new UTF8Encoding(false);
+                                await File.WriteAllLinesAsync(manifestPath, manifestLines, utf8NoBom);
+
+                                var psi = new ProcessStartInfo
+                                {
+                                    FileName = ffmpegPath,
+                                    Arguments = $"-y -f concat -safe 0 -i \"{manifestFileName}\" -c copy \"{outName}\"",
+                                    WorkingDirectory = recDir.FullName,
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                };
+
+                                using var proc = Process.Start(psi);
+                                if (proc != null)
+                                {
+                                    await proc.WaitForExitAsync();
+                                    if (proc.ExitCode == 0 && File.Exists(outPath) && new FileInfo(outPath).Length > 0)
+                                    {
+                                        foreach (var chunk in sessionChunks)
+                                        {
+                                            try { chunk.Delete(); } catch { }
+                                        }
+
+                                        stream.RecordingFileName = outName;
+                                        _logger.LogInformation("FinalizeStreamRecording: Locally merged {Count} chunks into {Merged} for stream {StreamId}", sessionChunks.Count, outName, stream.Id);
+                                        return stream.RecordingFileName;
+                                    }
+                                }
+                            }
+                            catch (Exception concatEx)
+                            {
+                                _logger.LogWarning(concatEx, "FinalizeStreamRecording: Local ffmpeg concat failed.");
+                            }
+                            finally
+                            {
+                                try { if (File.Exists(manifestPath)) File.Delete(manifestPath); } catch { }
+                            }
+                        }
+
+                        // If concat failed, pick the latest chunk
+                        stream.RecordingFileName = sessionChunks.Last().Name;
+                        return stream.RecordingFileName;
+                    }
+                }
+
+                // 3. Fallback to TryFindLatestRecordingOnDisk (strictly within session bounds if possible)
+                var diskFile = TryFindLatestRecordingOnDisk(channel.StreamKey, sessionStartEpoch, sessionEndEpoch);
+                if (!string.IsNullOrEmpty(diskFile))
+                {
+                    stream.RecordingFileName = diskFile;
+                    return stream.RecordingFileName;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "FinalizeStreamRecording failed for stream {StreamId}", stream.Id);
+            }
+
+            return stream.RecordingFileName;
+        }
+
+        private string? FindLocalFfmpeg()
+        {
+            var candidates = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "bin", "ffmpeg.exe"),
+                Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "bin", "ffmpeg.exe"),
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "bin", "ffmpeg.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe", "ffmpeg-9.0.1-full_build", "bin", "ffmpeg.exe")
+            };
+
+            foreach (var c in candidates)
+            {
+                if (File.Exists(c)) return c;
+            }
+
+            return null;
+        }
+
+        private string? TryFindLatestRecordingOnDisk(string streamKey, long? startEpoch = null, long? endEpoch = null)
+        {
+            try
+            {
+                var candidateDirs = new[]
+                {
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "nginx", "recordings")
+                };
+
+                foreach (var dir in candidateDirs)
+                {
+                    if (Directory.Exists(dir))
+                    {
+                        var dirInfo = new DirectoryInfo(dir);
+                        var query = dirInfo.GetFiles($"{streamKey}*.flv")
+                            .Concat(dirInfo.GetFiles($"{streamKey}*.mp4"))
+                            .Where(f => f.Length > 0 && !f.Name.Contains("-merged"));
+
+                        if (startEpoch.HasValue && endEpoch.HasValue)
+                        {
+                            query = query.Where(f =>
+                            {
+                                var ep = ExtractRecordingEpoch(f.Name, streamKey) ?? new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeSeconds();
+                                return ep >= (startEpoch.Value - 60) && ep <= (endEpoch.Value + 60);
+                            });
+                        }
+
+                        var latestFile = query.OrderByDescending(f => f.LastWriteTimeUtc).FirstOrDefault();
+                        if (latestFile != null)
+                        {
+                            _logger.LogInformation("Found recording on disk for {StreamKey}: {FileName}", streamKey, latestFile.Name);
+                            return latestFile.Name;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error scanning recordings directory for stream key {StreamKey}", streamKey);
+            }
+
+            return null;
         }
 
         private static string GenerateSecureStreamKey()

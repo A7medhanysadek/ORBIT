@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OrbitBackend.Data;
 
@@ -11,9 +12,11 @@ using OrbitBackend.Data;
 namespace OrbitBackend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912081244_AddChatBadgesAndOgUser")]
+    partial class AddChatBadgesAndOgUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -331,43 +334,6 @@ namespace OrbitBackend.Migrations
                         .HasFilter("[StreamKey] IS NOT NULL");
 
                     b.ToTable("Channels");
-                });
-
-            modelBuilder.Entity("OrbitBackend.Models.ChannelEmoji", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ChannelId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("EmojiValue")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<bool>("IsCustomImage")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChannelId");
-
-                    b.HasIndex("ChannelId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("ChannelEmojis");
                 });
 
             modelBuilder.Entity("OrbitBackend.Models.ChannelModerator", b =>
@@ -777,17 +743,6 @@ namespace OrbitBackend.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("OrbitBackend.Models.ChannelEmoji", b =>
-                {
-                    b.HasOne("OrbitBackend.Models.Channel", "Channel")
-                        .WithMany("CustomEmojis")
-                        .HasForeignKey("ChannelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Channel");
-                });
-
             modelBuilder.Entity("OrbitBackend.Models.ChannelModerator", b =>
                 {
                     b.HasOne("OrbitBackend.Models.Channel", "Channel")
@@ -991,8 +946,6 @@ namespace OrbitBackend.Migrations
             modelBuilder.Entity("OrbitBackend.Models.Channel", b =>
                 {
                     b.Navigation("Clips");
-
-                    b.Navigation("CustomEmojis");
 
                     b.Navigation("LiveStreams");
 

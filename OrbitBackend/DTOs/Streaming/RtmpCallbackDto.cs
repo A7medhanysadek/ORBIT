@@ -45,4 +45,14 @@ namespace OrbitBackend.DTOs.Streaming
         [FromForm(Name = "path")]
         public string? Path { get; set; }
     }
+
+    public class MediaServerMergeResponse
+    {
+        public bool Success { get; set; }
+        public string? MergedFileName { get; set; }
+        public string? MergedUrl { get; set; }
+        public long Size { get; set; }
+        public int FileCount { get; set; }
+        public string? Error { get; set; }
+    }
 }

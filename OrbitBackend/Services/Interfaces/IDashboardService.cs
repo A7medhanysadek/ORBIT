@@ -37,8 +37,18 @@ namespace OrbitBackend.Services.Interfaces
         Task<StreamResponseDto> UpdateCurrentStreamMetadataAsync(string userId, UpdateLiveStreamDto dto);
 
         /// <summary>
-        /// Regenerates the streamer's stream key for security.
+        /// Sets (replaces all) custom emojis for the streamer's channel chat.
         /// </summary>
-        Task<StreamKeyResponseDto> RegenerateStreamKeyAsync(string userId);
+        Task<List<CustomEmojiResponseDto>> SetCustomEmojisAsync(string userId, SetCustomEmojisDto dto);
+
+        /// <summary>
+        /// Gets all custom emojis for the streamer's channel.
+        /// </summary>
+        Task<List<CustomEmojiResponseDto>> GetCustomEmojisAsync(string userId);
+
+        /// <summary>
+        /// Gets the platform badge emoji configuration (owner, moderator, OG badges).
+        /// </summary>
+        BadgeEmojisResponseDto GetBadgeEmojis();
     }
 }

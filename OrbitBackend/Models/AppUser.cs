@@ -8,6 +8,11 @@ namespace OrbitBackend.Models
         public int Age { get; set; }
 
         /// <summary>
+        /// True for the first 100 registered users — OG badge holders.
+        /// </summary>
+        public bool IsOgUser { get; set; }
+
+        /// <summary>
         /// URL to the user's profile picture (Cloudinary).
         /// </summary>
         public string? ProfilePictureUrl { get; set; }

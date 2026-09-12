@@ -23,23 +23,6 @@ namespace OrbitBackend.Controllers
         }
 
         /// <summary>
-        /// Creates a new highlight clip. Authenticated users only.
-        /// Supports either multipart/form-data (with an attached video file) or JSON (with VideoUrl).
-        /// </summary>
-        [HttpPost]
-        [Authorize]
-        [Consumes("multipart/form-data", "application/json")]
-        [ProducesResponseType(typeof(ClipResponseDto), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> CreateClip([FromForm] CreateClipDto dto, IFormFile? videoFile)
-        {
-            var userId = GetUserId();
-            var result = await _clipService.CreateClipAsync(userId, dto, videoFile);
-            return CreatedAtAction(nameof(GetClipById), new { clipId = result.Id }, result);
-        }
-
-        /// <summary>
         /// Slices the last N seconds (default 60s, max 300s / 5 min) from a live stream on the media server side.
         /// Authenticated users only.
         /// </summary>

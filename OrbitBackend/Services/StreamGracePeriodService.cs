@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using OrbitBackend.Data;
 using OrbitBackend.Hubs;
+using OrbitBackend.Services.Interfaces;
+using System.Text.RegularExpressions;
 
 namespace OrbitBackend.Services
 {
@@ -84,10 +86,28 @@ namespace OrbitBackend.Services
                 var peak = _viewerTracker.GetPeakViewerCount(stream.Id);
                 stream.PeakViewers = Math.Max(stream.PeakViewers, peak);
 
-                // Auto-assign recording file if channel has SaveStreams enabled
-                if (stream.Channel != null && stream.Channel.SaveStreams && string.IsNullOrEmpty(stream.RecordingFileName))
+                // Auto-assign and merge recording files if channel has SaveStreams enabled
+                if (stream.Channel != null && stream.Channel.SaveStreams)
                 {
-                    stream.RecordingFileName = $"{stream.Channel.StreamKey}.flv";
+                    try
+                    {
+                        var streamService = scope.ServiceProvider.GetRequiredService<IStreamService>();
+                        await streamService.FinalizeStreamRecordingAsync(stream, stream.Channel);
+                    }
+                    catch (Exception finalizeEx)
+                    {
+                        _logger.LogWarning(finalizeEx, "Failed to finalize recording for stream {StreamId}", stream.Id);
+                        var startedUtc = DateTime.SpecifyKind(stream.StartedAt ?? stream.CreatedAt, DateTimeKind.Utc);
+                        var endedUtc = DateTime.SpecifyKind(stream.EndedAt ?? DateTime.UtcNow, DateTimeKind.Utc);
+                        long startEpoch = new DateTimeOffset(startedUtc).ToUnixTimeSeconds();
+                        long endEpoch = new DateTimeOffset(endedUtc).ToUnixTimeSeconds();
+
+                        var resolvedFile = TryFindLatestRecordingOnDisk(stream.Channel.StreamKey, startEpoch, endEpoch);
+                        if (!string.IsNullOrEmpty(resolvedFile))
+                        {
+                            stream.RecordingFileName = resolvedFile;
+                        }
+                    }
                 }
 
                 // Notify viewers via SignalR
@@ -105,13 +125,65 @@ namespace OrbitBackend.Services
 
                 _logger.LogInformation(
                     "Stream {StreamId} auto-ended after grace period expired. " +
-                    "Disconnected at {DisconnectedAt}, grace period {GracePeriod}s, peak viewers {Peak}.",
-                    stream.Id, stream.DisconnectedAt, gracePeriodSeconds, stream.PeakViewers);
+                    "Disconnected at {DisconnectedAt}, grace period {GracePeriod}s, peak viewers {Peak}, recording: {Recording}.",
+                    stream.Id, stream.DisconnectedAt, gracePeriodSeconds, stream.PeakViewers, stream.RecordingFileName ?? "None");
             }
 
             await context.SaveChangesAsync();
 
             _logger.LogInformation("{Count} stream(s) auto-ended after grace period expired.", expiredStreams.Count);
+        }
+
+        private string? TryFindLatestRecordingOnDisk(string? streamKey, long? startEpoch = null, long? endEpoch = null)
+        {
+            if (string.IsNullOrEmpty(streamKey)) return null;
+
+            try
+            {
+                var candidateDirs = new[]
+                {
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "nginx", "recordings")
+                };
+
+                foreach (var dir in candidateDirs)
+                {
+                    if (Directory.Exists(dir))
+                    {
+                        var dirInfo = new DirectoryInfo(dir);
+                        var query = dirInfo.GetFiles($"{streamKey}*.flv")
+                            .Concat(dirInfo.GetFiles($"{streamKey}*.mp4"))
+                            .Where(f => f.Length > 0 && !f.Name.Contains("-merged"));
+
+                        if (startEpoch.HasValue && endEpoch.HasValue)
+                        {
+                            var pattern = "^" + Regex.Escape(streamKey) + @"-(\d{9,12})";
+                            query = query.Where(f =>
+                            {
+                                var m = Regex.Match(f.Name, pattern);
+                                long ep = m.Success && long.TryParse(m.Groups[1].Value, out long parsed)
+                                    ? parsed
+                                    : new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeSeconds();
+                                return ep >= (startEpoch.Value - 60) && ep <= (endEpoch.Value + 60);
+                            });
+                        }
+
+                        var latestFile = query.OrderByDescending(f => f.LastWriteTimeUtc).FirstOrDefault();
+                        if (latestFile != null)
+                        {
+                            _logger.LogInformation("Found latest recording on disk for {StreamKey}: {FileName}", streamKey, latestFile.Name);
+                            return latestFile.Name;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error scanning recordings directory for stream key {StreamKey}", streamKey);
+            }
+
+            return null;
         }
     }
 }

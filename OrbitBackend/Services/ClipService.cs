@@ -58,6 +58,7 @@ namespace OrbitBackend.Services
 
             int? categoryId = dto.CategoryId;
             string? streamTitle = null;
+            int? resolvedLiveStreamId = dto.LiveStreamId;
 
             if (dto.LiveStreamId.HasValue)
             {
@@ -68,6 +69,21 @@ namespace OrbitBackend.Services
                 streamTitle = stream.Title;
                 // Inherit category from stream if not explicitly set
                 categoryId ??= stream.CategoryId;
+            }
+            else
+            {
+                // Auto-resolve: associate clip with the channel's current live stream if any
+                var currentLiveStream = await _context.LiveStreams
+                    .Where(s => s.ChannelId == channel.Id && s.IsLive)
+                    .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (currentLiveStream != null)
+                {
+                    resolvedLiveStreamId = currentLiveStream.Id;
+                    streamTitle = currentLiveStream.Title;
+                    categoryId ??= currentLiveStream.CategoryId;
+                }
             }
 
             if (categoryId.HasValue)
@@ -87,7 +103,7 @@ namespace OrbitBackend.Services
                 CreatedAt = DateTime.UtcNow,
                 CreatorId = userId,
                 ChannelId = channel.Id,
-                LiveStreamId = dto.LiveStreamId,
+                LiveStreamId = resolvedLiveStreamId,
                 CategoryId = categoryId
             };
 
@@ -272,7 +288,15 @@ namespace OrbitBackend.Services
                     .FirstOrDefaultAsync(c => c.Id == dto.ChannelId.Value)
                     ?? throw new InvalidOperationException("Channel not found.");
 
+                // Prioritize active live stream, then fall back to most recent stream
                 stream = await _context.LiveStreams
+                    .Include(s => s.Category)
+                    .Where(s => s.ChannelId == channel.Id && s.IsLive)
+                    .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                // Fall back to most recent stream if no live stream found
+                stream ??= await _context.LiveStreams
                     .Include(s => s.Category)
                     .Where(s => s.ChannelId == channel.Id)
                     .OrderByDescending(s => s.StartedAt ?? s.CreatedAt)
@@ -293,9 +317,12 @@ namespace OrbitBackend.Services
 
             // Call media server clipping endpoint via HTTP (Cloud-Ready, decoupled HTTP call)
             var clipApiUrl = _mediaServerConfig.GetClipServiceUrl();
+            bool isLive = stream != null && stream.IsLive;
             var payload = new
             {
                 streamKey = channel.StreamKey,
+                recordingFileName = isLive ? null : stream?.RecordingFileName,
+                isLive = isLive,
                 durationSeconds = durationSeconds,
                 title = dto.Title.Trim()
             };

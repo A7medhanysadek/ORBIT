@@ -26,11 +26,15 @@ namespace OrbitBackend.Services
         public async Task<ChatMessageDto> SaveMessageAsync(int streamId, string senderId, string content)
         {
             var stream = await _context.LiveStreams
+                .Include(s => s.Channel)
                 .FirstOrDefaultAsync(s => s.Id == streamId && s.IsLive)
                 ?? throw new InvalidOperationException("Stream not found or is not live.");
 
             var user = await _userManager.FindByIdAsync(senderId)
                 ?? throw new InvalidOperationException("User not found.");
+
+            // Resolve role-based badge emoji (priority: owner > moderator > OG)
+            string? badge = await ResolveSenderBadgeAsync(stream.ChannelId, stream.Channel.OwnerId, senderId, user.IsOgUser);
 
             // Calculate offset from stream start for VOD replay synchronization
             var offsetSeconds = stream.StartedAt.HasValue
@@ -42,6 +46,7 @@ namespace OrbitBackend.Services
                 LiveStreamId = streamId,
                 SenderId = senderId,
                 SenderName = user.FullName,
+                SenderBadge = badge,
                 Content = content,
                 SentAt = DateTime.UtcNow,
                 StreamOffsetSeconds = Math.Max(0, offsetSeconds)
@@ -66,6 +71,7 @@ namespace OrbitBackend.Services
                 {
                     Id = m.Id,
                     SenderName = m.SenderName,
+                    SenderBadge = m.SenderBadge,
                     Content = m.Content,
                     SentAt = m.SentAt,
                     StreamOffsetSeconds = m.StreamOffsetSeconds
@@ -85,6 +91,7 @@ namespace OrbitBackend.Services
                 {
                     Id = m.Id,
                     SenderName = m.SenderName,
+                    SenderBadge = m.SenderBadge,
                     Content = m.Content,
                     SentAt = m.SentAt,
                     StreamOffsetSeconds = m.StreamOffsetSeconds
@@ -98,10 +105,35 @@ namespace OrbitBackend.Services
             {
                 Id = message.Id,
                 SenderName = message.SenderName,
+                SenderBadge = message.SenderBadge,
                 Content = message.Content,
                 SentAt = message.SentAt,
                 StreamOffsetSeconds = message.StreamOffsetSeconds
             };
+        }
+
+        /// <summary>
+        /// Resolves the sender's role badge emoji for this channel.
+        /// Priority: 🌍 channel owner > 🪐 moderator > ⭐ OG user > null regular.
+        /// </summary>
+        private async Task<string?> ResolveSenderBadgeAsync(int channelId, string channelOwnerId, string senderId, bool isOgUser)
+        {
+            // Channel owner gets the Earth badge (highest priority)
+            if (senderId == channelOwnerId)
+                return "🌍";
+
+            // Check if sender is a moderator for this channel
+            var isModerator = await _context.ChannelModerators
+                .AnyAsync(m => m.ChannelId == channelId && m.UserId == senderId);
+
+            if (isModerator)
+                return "🪐";
+
+            // OG users (first 100 registered) get the star badge
+            if (isOgUser)
+                return "⭐";
+
+            return null;
         }
     }
 }

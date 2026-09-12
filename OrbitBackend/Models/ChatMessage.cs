@@ -20,6 +20,12 @@ namespace OrbitBackend.Models
         public string SenderName { get; set; } = string.Empty;
 
         /// <summary>
+        /// Denormalized role badge emoji for the sender at the time of sending.
+        /// 🌍 = channel owner, 🪐 = moderator, ⭐ = OG user, null = regular user.
+        /// </summary>
+        public string? SenderBadge { get; set; }
+
+        /// <summary>
         /// The chat message text content.
         /// </summary>
         public string Content { get; set; } = string.Empty;

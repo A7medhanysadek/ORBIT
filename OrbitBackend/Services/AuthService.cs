@@ -1,6 +1,8 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OrbitBackend.Data;
 using OrbitBackend.DTOs.Auth;
 using OrbitBackend.Models;
 using OrbitBackend.Services.Interfaces;
@@ -14,6 +16,7 @@ namespace OrbitBackend.Services
     public class AuthService : IAuthService
     {
         private readonly UserManager<AppUser> _userManager;
+        private readonly AppDbContext _context;
         private readonly IConfiguration _config;
         private readonly IMapper _mapper;
         private readonly IMailService _mailService;
@@ -23,11 +26,13 @@ namespace OrbitBackend.Services
 
         public AuthService(
             UserManager<AppUser> userManager,
+            AppDbContext context,
             IConfiguration config,
             IMapper mapper,
             IMailService mailService)
         {
             _userManager = userManager;
+            _context = context;
             _config = config;
             _mapper = mapper;
             _mailService = mailService;
@@ -52,6 +57,14 @@ namespace OrbitBackend.Services
             {
                 var errors = string.Join("; ", result.Errors.Select(e => e.Description));
                 throw new InvalidOperationException($"Registration failed: {errors}");
+            }
+
+            // Mark as OG user if among the first 100 registered users
+            var totalUsers = await _context.Users.CountAsync();
+            if (totalUsers <= 100)
+            {
+                user.IsOgUser = true;
+                await _userManager.UpdateAsync(user);
             }
 
             var otpCode = GenerateAlphanumericOtp();

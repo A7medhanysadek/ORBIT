@@ -36,7 +36,7 @@ namespace OrbitBackend.Services
             var recordingsBaseUrl = _mediaServerConfig.GetRecordingsBaseUrl();
 
             // Returns all finished streams that have a recording file OR where the channel saved streams
-            var vods = await _context.LiveStreams
+            var rawVods = await _context.LiveStreams
                 .AsNoTracking()
                 .Where(s => s.ChannelId == channelId
                     && !s.IsLive
@@ -45,13 +45,18 @@ namespace OrbitBackend.Services
                 .Include(s => s.Category)
                 .Include(s => s.Channel)
                 .OrderByDescending(s => s.EndedAt)
-                .Select(s => new SavedLiveDto
+                .ToListAsync();
+
+            var vods = rawVods.Select(s =>
+            {
+                var fileName = ResolveVodFileName(s.RecordingFileName, s.Channel?.StreamKey);
+                return new SavedLiveDto
                 {
                     Id = s.Id,
                     Title = s.Title,
                     Description = s.Description,
                     ThumbnailUrl = s.ThumbnailUrl,
-                    VodUrl = $"{recordingsBaseUrl}/{(s.RecordingFileName ?? $"{s.Channel.StreamKey}.flv")}",
+                    VodUrl = !string.IsNullOrEmpty(fileName) ? $"{recordingsBaseUrl}/{fileName}" : null,
                     CategoryName = s.Category != null ? s.Category.Name : null,
                     CategorySlug = s.Category != null ? s.Category.Slug : null,
                     DurationSeconds = s.StartedAt.HasValue && s.EndedAt.HasValue
@@ -61,8 +66,8 @@ namespace OrbitBackend.Services
                     EndedAt = s.EndedAt,
                     RewatchCount = s.VodViews.Count,
                     ChatMessageCount = s.ChatMessages.Count(m => !m.IsDeleted)
-                })
-                .ToListAsync();
+                };
+            }).Where(v => !string.IsNullOrEmpty(v.VodUrl)).ToList();
 
             return vods;
         }
@@ -84,10 +89,9 @@ namespace OrbitBackend.Services
             if (stream.IsLive)
                 throw new InvalidOperationException("This stream is currently live.");
 
-            if (string.IsNullOrEmpty(stream.RecordingFileName) && !stream.Channel.SaveStreams)
-                throw new InvalidOperationException("This stream is not available as a VOD.");
-
-            var fileName = stream.RecordingFileName ?? $"{stream.Channel.StreamKey}.flv";
+            var fileName = ResolveVodFileName(stream.RecordingFileName, stream.Channel?.StreamKey);
+            if (string.IsNullOrEmpty(fileName))
+                throw new InvalidOperationException("Recording file not found for this VOD.");
 
             return new VodDetailDto
             {
@@ -104,8 +108,8 @@ namespace OrbitBackend.Services
                 StartedAt = stream.StartedAt,
                 EndedAt = stream.EndedAt,
                 RewatchCount = stream.VodViews.Count,
-                StreamerName = stream.Streamer.FullName,
-                ChannelName = stream.Channel.ChannelName,
+                StreamerName = stream.Streamer?.FullName ?? string.Empty,
+                ChannelName = stream.Channel?.ChannelName ?? string.Empty,
                 ChannelId = stream.ChannelId,
                 ChatMessages = stream.ChatMessages
                     .OrderBy(m => m.StreamOffsetSeconds)
@@ -113,6 +117,7 @@ namespace OrbitBackend.Services
                     {
                         Id = m.Id,
                         SenderName = m.SenderName,
+                        SenderBadge = m.SenderBadge,
                         Content = m.Content,
                         SentAt = m.SentAt,
                         StreamOffsetSeconds = m.StreamOffsetSeconds
@@ -175,6 +180,49 @@ namespace OrbitBackend.Services
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("VOD for stream {StreamId} deleted by channel owner {UserId}.", vodId, userId);
+        }
+
+        private string? ResolveVodFileName(string? recordingFileName, string? streamKey)
+        {
+            if (!string.IsNullOrEmpty(recordingFileName))
+                return recordingFileName;
+
+            if (string.IsNullOrEmpty(streamKey))
+                return null;
+
+            try
+            {
+                var candidateDirs = new[]
+                {
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "nginx", "recordings")
+                };
+
+                foreach (var dir in candidateDirs)
+                {
+                    if (Directory.Exists(dir))
+                    {
+                        var dirInfo = new DirectoryInfo(dir);
+                        var latestFile = dirInfo.GetFiles($"{streamKey}*.flv")
+                            .Concat(dirInfo.GetFiles($"{streamKey}*.mp4"))
+                            .Where(f => f.Length > 0)
+                            .OrderByDescending(f => f.LastWriteTimeUtc)
+                            .FirstOrDefault();
+
+                        if (latestFile != null)
+                        {
+                            return latestFile.Name;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error scanning recordings directory for stream key {StreamKey}", streamKey);
+            }
+
+            return null;
         }
     }
 }

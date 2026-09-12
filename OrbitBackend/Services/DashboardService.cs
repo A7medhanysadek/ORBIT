@@ -183,7 +183,7 @@ namespace OrbitBackend.Services
                     ? (s.EndedAt.Value - s.StartedAt.Value).TotalSeconds
                     : 0;
 
-                var fileName = s.RecordingFileName ?? (channel.SaveStreams ? $"{channel.StreamKey}.flv" : null);
+                var fileName = ResolveVodFileName(s.RecordingFileName, channel.StreamKey);
 
                 return new PastStreamDto
                 {
@@ -288,9 +288,81 @@ namespace OrbitBackend.Services
             return await _streamService.UpdateStreamAsync(userId, dto);
         }
 
-        public async Task<StreamKeyResponseDto> RegenerateStreamKeyAsync(string userId)
+        public async Task<List<CustomEmojiResponseDto>> SetCustomEmojisAsync(string userId, SetCustomEmojisDto dto)
         {
-            return await _streamService.GenerateStreamKeyAsync(userId);
+            var channel = await GetUserChannelAsync(userId);
+
+            // Remove all existing custom emojis for this channel
+            var existing = await _context.ChannelEmojis
+                .Where(e => e.ChannelId == channel.Id)
+                .ToListAsync();
+
+            _context.ChannelEmojis.RemoveRange(existing);
+
+            // Add new emojis
+            var newEmojis = dto.Emojis.Select(e => new ChannelEmoji
+            {
+                Name = e.Name.ToLowerInvariant(),
+                EmojiValue = e.EmojiValue,
+                IsCustomImage = e.IsCustomImage,
+                ChannelId = channel.Id,
+                CreatedAt = DateTime.UtcNow
+            }).ToList();
+
+            _context.ChannelEmojis.AddRange(newEmojis);
+            await _context.SaveChangesAsync();
+
+            return newEmojis.Select(e => new CustomEmojiResponseDto
+            {
+                Id = e.Id,
+                Name = e.Name,
+                EmojiValue = e.EmojiValue,
+                IsCustomImage = e.IsCustomImage,
+                CreatedAt = e.CreatedAt
+            }).ToList();
+        }
+
+        public async Task<List<CustomEmojiResponseDto>> GetCustomEmojisAsync(string userId)
+        {
+            var channel = await GetUserChannelAsync(userId);
+
+            return await _context.ChannelEmojis
+                .Where(e => e.ChannelId == channel.Id)
+                .OrderBy(e => e.Name)
+                .Select(e => new CustomEmojiResponseDto
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    EmojiValue = e.EmojiValue,
+                    IsCustomImage = e.IsCustomImage,
+                    CreatedAt = e.CreatedAt
+                })
+                .ToListAsync();
+        }
+
+        public BadgeEmojisResponseDto GetBadgeEmojis()
+        {
+            return new BadgeEmojisResponseDto
+            {
+                Owner = new BadgeInfoDto
+                {
+                    Role = "Channel Owner",
+                    Emoji = "🌍",
+                    Description = "Earth — the channel owner's home planet"
+                },
+                Moderator = new BadgeInfoDto
+                {
+                    Role = "Moderator",
+                    Emoji = "🪐",
+                    Description = "Saturn — galaxy-inspired wisdom and authority"
+                },
+                OgUser = new BadgeInfoDto
+                {
+                    Role = "OG User",
+                    Emoji = "⭐",
+                    Description = "Gold star — first 100 registered users, early adopters"
+                }
+            };
         }
 
         private async Task<Channel> GetUserChannelAsync(string userId)
@@ -313,6 +385,49 @@ namespace OrbitBackend.Services
             return ts.TotalHours >= 1
                 ? $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}"
                 : $"{ts.Minutes:D2}:{ts.Seconds:D2}";
+        }
+
+        private static string? ResolveVodFileName(string? recordingFileName, string? streamKey)
+        {
+            if (!string.IsNullOrEmpty(recordingFileName))
+                return recordingFileName;
+
+            if (string.IsNullOrEmpty(streamKey))
+                return null;
+
+            try
+            {
+                var candidateDirs = new[]
+                {
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "nginx", "recordings"),
+                    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "nginx", "recordings")
+                };
+
+                foreach (var dir in candidateDirs)
+                {
+                    if (Directory.Exists(dir))
+                    {
+                        var dirInfo = new DirectoryInfo(dir);
+                        var latestFile = dirInfo.GetFiles($"{streamKey}*.flv")
+                            .Concat(dirInfo.GetFiles($"{streamKey}*.mp4"))
+                            .Where(f => f.Length > 0)
+                            .OrderByDescending(f => f.LastWriteTimeUtc)
+                            .FirstOrDefault();
+
+                        if (latestFile != null)
+                        {
+                            return latestFile.Name;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore disk read errors in dashboard
+            }
+
+            return null;
         }
     }
 }
