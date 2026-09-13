@@ -72,6 +72,18 @@ namespace OrbitBackend.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Searches channels by channel name, description, or owner. Public endpoint.
+        /// </summary>
+        [HttpGet("search")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(List<OrbitBackend.DTOs.Admin.ChannelSearchResultDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SearchChannels([FromQuery] string q = "")
+        {
+            var result = await _channelService.SearchChannelsAsync(q);
+            return Ok(result);
+        }
+
         // ── Moderator Management ──
 
         /// <summary>

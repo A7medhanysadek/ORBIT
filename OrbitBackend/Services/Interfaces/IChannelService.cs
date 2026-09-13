@@ -62,5 +62,10 @@ namespace OrbitBackend.Services.Interfaces
         /// Gets social links for any channel by ID.
         /// </summary>
         Task<List<ChannelSocialLinkDto>> GetSocialLinksAsync(int channelId);
+
+        /// <summary>
+        /// Searches channels by channel name, description, or owner name.
+        /// </summary>
+        Task<List<OrbitBackend.DTOs.Admin.ChannelSearchResultDto>> SearchChannelsAsync(string query);
     }
 }

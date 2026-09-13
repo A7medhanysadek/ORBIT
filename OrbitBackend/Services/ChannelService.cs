@@ -13,6 +13,7 @@ namespace OrbitBackend.Services
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ICloudinaryService _cloudinaryService;
+        private readonly ViewerTracker _viewerTracker;
         private readonly ILogger<ChannelService> _logger;
 
         public ChannelService(
@@ -20,12 +21,14 @@ namespace OrbitBackend.Services
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
             ICloudinaryService cloudinaryService,
+            ViewerTracker viewerTracker,
             ILogger<ChannelService> logger)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
             _cloudinaryService = cloudinaryService;
+            _viewerTracker = viewerTracker;
             _logger = logger;
         }
 
@@ -323,6 +326,43 @@ namespace OrbitBackend.Services
                     Url = sl.Url
                 })
                 .ToListAsync();
+        }
+
+        public async Task<List<OrbitBackend.DTOs.Admin.ChannelSearchResultDto>> SearchChannelsAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return new List<OrbitBackend.DTOs.Admin.ChannelSearchResultDto>();
+
+            var trimmed = query.Trim().ToLower();
+
+            var channels = await _context.Channels
+                .Include(c => c.Owner)
+                .Include(c => c.LiveStreams)
+                    .ThenInclude(s => s.Category)
+                .Where(c =>
+                    c.ChannelName.ToLower().Contains(trimmed) ||
+                    (c.Description != null && c.Description.ToLower().Contains(trimmed)) ||
+                    (c.Owner != null && c.Owner.UserName != null && c.Owner.UserName.ToLower().Contains(trimmed)) ||
+                    (c.Owner != null && c.Owner.FullName != null && c.Owner.FullName.ToLower().Contains(trimmed)))
+                .Take(30)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return channels.Select(c =>
+            {
+                var activeStream = c.LiveStreams.FirstOrDefault(s => s.IsLive);
+                return new OrbitBackend.DTOs.Admin.ChannelSearchResultDto
+                {
+                    Id = c.Id,
+                    ChannelName = c.ChannelName,
+                    Description = c.Description,
+                    ProfilePhotoUrl = c.ProfilePhotoUrl,
+                    OwnerUsername = c.Owner?.UserName ?? c.Owner?.FullName ?? string.Empty,
+                    IsLive = activeStream != null,
+                    ViewerCount = activeStream != null ? _viewerTracker.GetViewerCount(activeStream.Id) : 0,
+                    CategoryName = activeStream?.Category?.Name
+                };
+            }).ToList();
         }
 
         private static ChannelResponseDto MapToResponseDto(Channel channel, AppUser owner)
