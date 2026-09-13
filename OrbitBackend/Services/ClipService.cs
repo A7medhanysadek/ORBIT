@@ -390,14 +390,35 @@ namespace OrbitBackend.Services
             return MapToResponseDto(clip);
         }
 
-        private static ClipResponseDto MapToResponseDto(Clip clip)
+        private ClipResponseDto MapToResponseDto(Clip clip)
         {
+            var clipsBaseUrl = _mediaServerConfig.GetClipsBaseUrl();
+            var videoUrl = clip.VideoUrl;
+            if (!string.IsNullOrEmpty(videoUrl) && (videoUrl.Contains("localhost") || !videoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                var fileName = Path.GetFileName(videoUrl);
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    videoUrl = $"{clipsBaseUrl}/{fileName}";
+                }
+            }
+
+            var thumbnailUrl = clip.ThumbnailUrl;
+            if (!string.IsNullOrEmpty(thumbnailUrl) && thumbnailUrl.Contains("localhost"))
+            {
+                var thumbFileName = Path.GetFileName(thumbnailUrl);
+                if (!string.IsNullOrEmpty(thumbFileName))
+                {
+                    thumbnailUrl = $"{clipsBaseUrl}/{thumbFileName}";
+                }
+            }
+
             return new ClipResponseDto
             {
                 Id = clip.Id,
                 Title = clip.Title,
-                VideoUrl = clip.VideoUrl,
-                ThumbnailUrl = clip.ThumbnailUrl,
+                VideoUrl = videoUrl,
+                ThumbnailUrl = thumbnailUrl,
                 DurationSeconds = clip.DurationSeconds,
                 ViewCount = clip.ViewCount,
                 CreatedAt = clip.CreatedAt,
