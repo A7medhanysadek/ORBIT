@@ -50,12 +50,17 @@ namespace OrbitBackend.Services
             var vods = rawVods.Select(s =>
             {
                 var fileName = ResolveVodFileName(s.RecordingFileName, s.Channel?.StreamKey);
+                var thumbName = !string.IsNullOrEmpty(fileName) ? $"{Path.GetFileNameWithoutExtension(fileName)}.jpg" : null;
+                var resolvedThumbnailUrl = !string.IsNullOrEmpty(s.ThumbnailUrl) && !s.ThumbnailUrl.Contains("localhost")
+                    ? s.ThumbnailUrl
+                    : (!string.IsNullOrEmpty(thumbName) ? $"{recordingsBaseUrl}/{thumbName}" : null);
+
                 return new SavedLiveDto
                 {
                     Id = s.Id,
                     Title = s.Title,
                     Description = s.Description,
-                    ThumbnailUrl = s.ThumbnailUrl,
+                    ThumbnailUrl = resolvedThumbnailUrl,
                     VodUrl = !string.IsNullOrEmpty(fileName) ? $"{recordingsBaseUrl}/{fileName}" : null,
                     CategoryName = s.Category != null ? s.Category.Name : null,
                     CategorySlug = s.Category != null ? s.Category.Slug : null,
@@ -93,12 +98,17 @@ namespace OrbitBackend.Services
             if (string.IsNullOrEmpty(fileName))
                 throw new InvalidOperationException("Recording file not found for this VOD.");
 
+            var thumbName = $"{Path.GetFileNameWithoutExtension(fileName)}.jpg";
+            var resolvedThumbnailUrl = !string.IsNullOrEmpty(stream.ThumbnailUrl) && !stream.ThumbnailUrl.Contains("localhost")
+                ? stream.ThumbnailUrl
+                : $"{recordingsBaseUrl}/{thumbName}";
+
             return new VodDetailDto
             {
                 Id = stream.Id,
                 Title = stream.Title,
                 Description = stream.Description,
-                ThumbnailUrl = stream.ThumbnailUrl,
+                ThumbnailUrl = resolvedThumbnailUrl,
                 VodUrl = $"{recordingsBaseUrl}/{fileName}",
                 CategoryName = stream.Category?.Name,
                 CategorySlug = stream.Category?.Slug,

@@ -776,7 +776,54 @@ namespace OrbitBackend.Services
                 _logger.LogWarning(ex, "FinalizeStreamRecording failed for stream {StreamId}", stream.Id);
             }
 
+            if (!string.IsNullOrEmpty(stream.RecordingFileName))
+            {
+                TryGenerateRecordingThumbnail(stream.RecordingFileName, null);
+                stream.ThumbnailUrl = $"{_mediaServerConfig.GetRecordingsBaseUrl()}/{Path.GetFileNameWithoutExtension(stream.RecordingFileName)}.jpg";
+            }
+
             return stream.RecordingFileName;
+        }
+
+        private void TryGenerateRecordingThumbnail(string recordingFileName, string? recDirPath)
+        {
+            try
+            {
+                var dir = recDirPath;
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                {
+                    var candidateDirs = new[]
+                    {
+                        Path.Combine(Directory.GetCurrentDirectory(), "..", "StreamingServer", "nginx", "recordings"),
+                        Path.Combine(Directory.GetCurrentDirectory(), "StreamingServer", "nginx", "recordings"),
+                        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "StreamingServer", "nginx", "recordings")
+                    };
+                    dir = candidateDirs.FirstOrDefault(Directory.Exists);
+                }
+
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+
+                var videoPath = Path.Combine(dir, recordingFileName);
+                if (!File.Exists(videoPath)) return;
+
+                var thumbPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(recordingFileName)}.jpg");
+                if (File.Exists(thumbPath)) return;
+
+                var ffmpeg = FindLocalFfmpeg() ?? "ffmpeg";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = ffmpeg,
+                    Arguments = $"-y -ss 00:00:02 -i \"{videoPath}\" -vframes 1 -q:v 2 \"{thumbPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var p = Process.Start(psi);
+                p?.WaitForExit(5000);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "TryGenerateRecordingThumbnail failed for {FileName}", recordingFileName);
+            }
         }
 
         private string? FindLocalFfmpeg()
