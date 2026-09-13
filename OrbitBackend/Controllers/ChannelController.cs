@@ -47,16 +47,22 @@ namespace OrbitBackend.Controllers
         /// Gets the channel owned by the authenticated user.
         /// </summary>
         [HttpGet("me")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(ChannelResponseDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetMyChannel()
         {
             var userId = GetUserId();
-            var result = await _channelService.GetMyChannelAsync(userId);
-            return Ok(result);
+            try
+            {
+                var result = await _channelService.GetMyChannelAsync(userId);
+                return Ok(result);
+            }
+            catch (InvalidOperationException)
+            {
+                return NotFound(new { message = "You don't have a channel." });
+            }
         }
 
         /// <summary>

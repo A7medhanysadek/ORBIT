@@ -243,8 +243,21 @@ namespace OrbitBackend.Services
 
             if (!hasPendingStream)
             {
-                _logger.LogWarning("Stream key validation failed — no pending or disconnected stream for user {UserId}.", user.Id);
-                return false;
+                // Auto-create a pending stream session so streamers can start streaming directly from OBS
+                var autoStream = new LiveStream
+                {
+                    Title = $"{channel.ChannelName ?? user.UserName}'s Live Stream",
+                    Description = "Live broadcast on Orbit",
+                    IsLive = false,
+                    StreamerId = user.Id,
+                    ChannelId = channel.Id,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.LiveStreams.Add(autoStream);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Auto-created stream session {StreamId} for user {UserId} upon direct OBS publish.", autoStream.Id, user.Id);
+                return true;
             }
 
             _logger.LogInformation("Stream key validated for user {UserId}.", user.Id);
@@ -377,6 +390,33 @@ namespace OrbitBackend.Services
 
             var channel = stream.Channel;
             var now = DateTime.UtcNow;
+
+            // If the stream was never live and never broadcasted (pending session before OBS):
+            if (!stream.IsLive && stream.StartedAt == null)
+            {
+                stream.IsLive = false;
+                stream.EndedAt = now;
+                stream.DisconnectedAt = null;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Pending stream session {StreamId} ended/cancelled before OBS broadcast started.", stream.Id);
+
+                return new StreamSessionSummaryDto
+                {
+                    StreamId = stream.Id,
+                    Title = stream.Title,
+                    StartedAt = null,
+                    EndedAt = now,
+                    DurationSeconds = 0,
+                    FormattedDuration = "00:00:00",
+                    PeakViewers = 0,
+                    TotalChatMessages = 0,
+                    IsSavedAsVod = false,
+                    VodUrl = null,
+                    Message = "Pending stream session ended successfully."
+                };
+            }
+
             var startedAt = stream.StartedAt ?? stream.CreatedAt;
             var durationSeconds = (now - startedAt).TotalSeconds;
 
@@ -546,9 +586,10 @@ namespace OrbitBackend.Services
         {
             try
             {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
                 var baseControlUrl = _mediaServerConfig.GetControlUrl();
                 var controlUrl = $"{baseControlUrl}/drop/publisher?app=live&name={Uri.EscapeDataString(streamKey)}";
-                var response = await _httpClient.GetAsync(controlUrl);
+                var response = await _httpClient.GetAsync(controlUrl, cts.Token);
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("Dropped RTMP publisher in NGINX via {ControlUrl}.", controlUrl);
@@ -628,7 +669,8 @@ namespace OrbitBackend.Services
 
                 try
                 {
-                    var response = await _httpClient.PostAsJsonAsync(mergeUrl, payload);
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                    var response = await _httpClient.PostAsJsonAsync(mergeUrl, payload, cts.Token);
                     if (response.IsSuccessStatusCode)
                     {
                         var result = await response.Content.ReadFromJsonAsync<MediaServerMergeResponse>();
@@ -665,7 +707,7 @@ namespace OrbitBackend.Services
                         var ffmpegPath = FindLocalFfmpeg();
                         if (!string.IsNullOrEmpty(ffmpegPath))
                         {
-                            var outName = $"{Path.GetFileNameWithoutExtension(sessionChunks[0].Name)}-merged{sessionChunks[0].Extension}";
+                            var outName = $"{Path.GetFileNameWithoutExtension(sessionChunks[0].Name)}-merged.mp4";
                             var outPath = Path.Combine(recDir.FullName, outName);
                             var manifestFileName = $"concat_{stream.Id}_{Guid.NewGuid():N}.txt";
                             var manifestPath = Path.Combine(recDir.FullName, manifestFileName);

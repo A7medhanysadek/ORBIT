@@ -14,7 +14,7 @@ namespace OrbitBackend.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Streamer")]
+    [Authorize]
     [Produces("application/json")]
     public class DashboardController : ControllerBase
     {

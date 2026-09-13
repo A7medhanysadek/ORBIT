@@ -31,7 +31,7 @@ namespace OrbitBackend.Controllers
         
         
         [HttpPost("key/generate")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(StreamKeyResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -46,7 +46,7 @@ namespace OrbitBackend.Controllers
         
         
         [HttpGet("key")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(StreamKeyResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -62,7 +62,7 @@ namespace OrbitBackend.Controllers
         
         
         [HttpPost("create")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(StreamResponseDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -85,7 +85,7 @@ namespace OrbitBackend.Controllers
         /// Broadcasts real-time SignalR notification to viewers.
         /// </summary>
         [HttpPatch("current")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(StreamResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -104,7 +104,7 @@ namespace OrbitBackend.Controllers
         /// Manually ends the active or pending stream, disconnects RTMP, and cleans up tracking.
         /// </summary>
         [HttpPost("end")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(StreamSessionSummaryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

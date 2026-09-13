@@ -73,7 +73,7 @@ namespace OrbitBackend.Controllers
         /// Deletes a saved VOD from the channel archive. Only the channel owner can delete it.
         /// </summary>
         [HttpDelete("{vodId:int}")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

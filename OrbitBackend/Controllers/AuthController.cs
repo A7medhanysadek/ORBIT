@@ -85,7 +85,7 @@ namespace OrbitBackend.Controllers
         }
 
         [HttpPost("refresh-token")]
-        [Authorize]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -97,11 +97,15 @@ namespace OrbitBackend.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
                       ?? User.FindFirstValue("sub");
 
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized(new { message = "Could not identify the user from the token." });
-
-            var result = await _authService.RefreshTokenAsync(userId, dto);
-            return Ok(result);
+            try
+            {
+                var result = await _authService.RefreshTokenAsync(dto, userId);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
         }
 
         [HttpPost("revoke-token")]

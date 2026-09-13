@@ -119,10 +119,26 @@ namespace OrbitBackend.Services
             return await BuildAuthResponseAsync(user);
         }
 
-        public async Task<AuthResponseDto> RefreshTokenAsync(string userId, RefreshTokenDto dto)
+        public Task<AuthResponseDto> RefreshTokenAsync(string userId, RefreshTokenDto dto) => RefreshTokenAsync(dto, userId);
+
+        public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto dto, string? userId = null)
         {
-            var user = await _userManager.FindByIdAsync(userId)
-                ?? throw new InvalidOperationException("User not found.");
+            if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+                throw new InvalidOperationException("Refresh token is required.");
+
+            AppUser? user = null;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                user = await _userManager.FindByIdAsync(userId);
+            }
+
+            if (user == null)
+            {
+                user = await _userManager.Users.FirstOrDefaultAsync(u => u.RefreshToken == dto.RefreshToken);
+            }
+
+            if (user == null)
+                throw new InvalidOperationException("Invalid refresh token.");
 
             if (user.RefreshToken != dto.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
                 throw new InvalidOperationException("Invalid or expired refresh token.");
