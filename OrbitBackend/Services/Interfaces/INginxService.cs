@@ -11,7 +11,7 @@ namespace OrbitBackend.Services.Interfaces
         
         
         
-        MediaServerConfigDto SetUrls(string rtmpUrl, string hlsBaseUrl);
+        MediaServerConfigDto SetUrls(string rtmpUrl, string hlsBaseUrl, string? clipsBaseUrl = null, string? recordingsBaseUrl = null);
 
         
         

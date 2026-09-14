@@ -15,6 +15,8 @@ namespace OrbitBackend.Services
         private readonly object _lock = new();
         private string? _rtmpUrl;
         private string? _hlsBaseUrl;
+        private string? _clipsBaseUrl;
+        private string? _recordingsBaseUrl;
 
         public MediaServerConfigService(IConfiguration config, ILogger<MediaServerConfigService> logger)
         {
@@ -33,7 +35,7 @@ namespace OrbitBackend.Services
             }
         }
 
-        public MediaServerConfigDto SetUrls(string rtmpUrl, string hlsBaseUrl)
+        public MediaServerConfigDto SetUrls(string rtmpUrl, string hlsBaseUrl, string? clipsBaseUrl = null, string? recordingsBaseUrl = null)
         {
             rtmpUrl = rtmpUrl.TrimEnd('/');
             hlsBaseUrl = hlsBaseUrl.TrimEnd('/');
@@ -42,11 +44,17 @@ namespace OrbitBackend.Services
             {
                 _rtmpUrl = rtmpUrl;
                 _hlsBaseUrl = hlsBaseUrl;
+                _clipsBaseUrl = !string.IsNullOrWhiteSpace(clipsBaseUrl)
+                    ? clipsBaseUrl.TrimEnd('/')
+                    : hlsBaseUrl.Replace("/hls", "/clips");
+                _recordingsBaseUrl = !string.IsNullOrWhiteSpace(recordingsBaseUrl)
+                    ? recordingsBaseUrl.TrimEnd('/')
+                    : hlsBaseUrl.Replace("/hls", "/recordings");
             }
 
             _logger.LogInformation(
-                "Media server URLs configured — RTMP: {RtmpUrl}, HLS: {HlsBaseUrl}",
-                rtmpUrl, hlsBaseUrl);
+                "Media server URLs configured — RTMP: {RtmpUrl}, HLS: {HlsBaseUrl}, Clips: {ClipsBaseUrl}",
+                rtmpUrl, hlsBaseUrl, _clipsBaseUrl);
 
             return BuildConfigDto("Media server URLs configured successfully.");
         }
@@ -57,6 +65,8 @@ namespace OrbitBackend.Services
             {
                 _rtmpUrl = null;
                 _hlsBaseUrl = null;
+                _clipsBaseUrl = null;
+                _recordingsBaseUrl = null;
             }
 
             _logger.LogInformation("Media server URLs cleared. Streaming is now offline.");
@@ -109,6 +119,15 @@ namespace OrbitBackend.Services
 
         public string GetClipsBaseUrl()
         {
+            lock (_lock)
+            {
+                if (!string.IsNullOrEmpty(_clipsBaseUrl))
+                    return _clipsBaseUrl;
+
+                if (!string.IsNullOrEmpty(_hlsBaseUrl))
+                    return _hlsBaseUrl.Replace("/hls", "/clips");
+            }
+
             var configured = _config["Streaming:ClipsBaseUrl"];
             if (!string.IsNullOrEmpty(configured))
                 return configured.TrimEnd('/');
@@ -119,6 +138,15 @@ namespace OrbitBackend.Services
 
         public string GetRecordingsBaseUrl()
         {
+            lock (_lock)
+            {
+                if (!string.IsNullOrEmpty(_recordingsBaseUrl))
+                    return _recordingsBaseUrl;
+
+                if (!string.IsNullOrEmpty(_hlsBaseUrl))
+                    return _hlsBaseUrl.Replace("/hls", "/recordings");
+            }
+
             var configured = _config["Streaming:RecordingsBaseUrl"];
             if (!string.IsNullOrEmpty(configured))
                 return configured.TrimEnd('/');

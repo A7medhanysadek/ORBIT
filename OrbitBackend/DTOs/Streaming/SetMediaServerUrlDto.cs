@@ -17,5 +17,9 @@ namespace OrbitBackend.DTOs.Streaming
         
         [Required]
         public string HlsBaseUrl { get; set; } = string.Empty;
+
+        public string? ClipsBaseUrl { get; set; }
+
+        public string? RecordingsBaseUrl { get; set; }
     }
 }

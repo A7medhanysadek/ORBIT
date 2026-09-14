@@ -207,7 +207,7 @@ namespace OrbitBackend.Controllers
             if (string.IsNullOrWhiteSpace(dto.RtmpUrl) || string.IsNullOrWhiteSpace(dto.HlsBaseUrl))
                 return BadRequest(new { message = "Both RTMP and HLS URLs are required." });
 
-            var result = _mediaServerConfig.SetUrls(dto.RtmpUrl, dto.HlsBaseUrl);
+            var result = _mediaServerConfig.SetUrls(dto.RtmpUrl, dto.HlsBaseUrl, dto.ClipsBaseUrl, dto.RecordingsBaseUrl);
             return Ok(result);
         }
 

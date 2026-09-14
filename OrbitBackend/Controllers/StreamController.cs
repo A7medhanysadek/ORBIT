@@ -260,7 +260,7 @@ namespace OrbitBackend.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public IActionResult SetMediaServerUrl([FromBody] SetMediaServerUrlDto dto)
         {
-            var result = _mediaServerConfig.SetUrls(dto.RtmpUrl, dto.HlsBaseUrl);
+            var result = _mediaServerConfig.SetUrls(dto.RtmpUrl, dto.HlsBaseUrl, dto.ClipsBaseUrl, dto.RecordingsBaseUrl);
             return Ok(result);
         }
 
