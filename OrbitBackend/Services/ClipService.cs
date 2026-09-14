@@ -423,7 +423,7 @@ namespace OrbitBackend.Services
         {
             var clipsBaseUrl = _mediaServerConfig.GetClipsBaseUrl();
             var videoUrl = clip.VideoUrl;
-            if (!string.IsNullOrEmpty(videoUrl) && (videoUrl.Contains("localhost") || !videoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrEmpty(videoUrl))
             {
                 var fileName = Path.GetFileName(videoUrl);
                 if (!string.IsNullOrEmpty(fileName))
@@ -433,7 +433,7 @@ namespace OrbitBackend.Services
             }
 
             var thumbnailUrl = clip.ThumbnailUrl;
-            if (!string.IsNullOrEmpty(thumbnailUrl) && thumbnailUrl.Contains("localhost"))
+            if (!string.IsNullOrEmpty(thumbnailUrl) && !thumbnailUrl.Contains("cloudinary.com", StringComparison.OrdinalIgnoreCase))
             {
                 var thumbFileName = Path.GetFileName(thumbnailUrl);
                 if (!string.IsNullOrEmpty(thumbFileName))

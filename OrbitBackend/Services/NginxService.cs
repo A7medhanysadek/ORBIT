@@ -131,11 +131,22 @@ namespace OrbitBackend.Services
         {
             lock (_lock)
             {
+                var effectiveRtmp = GetRtmpUrl();
+                var effectiveHls = GetHlsBaseUrl();
+                var clipsBase = GetClipsBaseUrl();
+                var recordingsBase = GetRecordingsBaseUrl();
+                var isCustom = !string.IsNullOrEmpty(_rtmpUrl) && !string.IsNullOrEmpty(_hlsBaseUrl);
+
                 return new MediaServerConfigDto
                 {
-                    IsConfigured = !string.IsNullOrEmpty(_rtmpUrl) && !string.IsNullOrEmpty(_hlsBaseUrl),
-                    RtmpUrl = _rtmpUrl,
-                    HlsBaseUrl = _hlsBaseUrl,
+                    IsConfigured = isCustom || !string.IsNullOrEmpty(effectiveHls),
+                    IsCustomConfigured = isCustom,
+                    RtmpUrl = _rtmpUrl ?? effectiveRtmp,
+                    HlsBaseUrl = _hlsBaseUrl ?? effectiveHls,
+                    ClipsBaseUrl = clipsBase,
+                    RecordingsBaseUrl = recordingsBase,
+                    EffectiveRtmpUrl = effectiveRtmp,
+                    EffectiveHlsBaseUrl = effectiveHls,
                     Message = message
                 };
             }
