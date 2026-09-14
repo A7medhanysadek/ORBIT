@@ -93,7 +93,7 @@ namespace OrbitBackend.Services
         {
             lock (_lock)
             {
-                return _hlsBaseUrl ?? _config["Streaming:HlsBaseUrl"] ?? "http://localhost:8080/hls";
+                return _hlsBaseUrl ?? _config["Streaming:HlsBaseUrl"] ?? "https://localhost:8443/hls";
             }
         }
 
