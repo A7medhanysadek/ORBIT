@@ -23,6 +23,7 @@ namespace OrbitBackend.Configuration
             services.AddScoped<IClipService, ClipService>();
             services.AddScoped<IDashboardService, DashboardService>();
             services.AddScoped<IAdminService, AdminService>();
+            services.AddScoped<INotificationService, NotificationService>();
             services.AddHttpClient();
             services.AddSingleton<ICloudinaryService, CloudinaryService>();
             services.AddSingleton<IMediaServerConfigService, MediaServerConfigService>();

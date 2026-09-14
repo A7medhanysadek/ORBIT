@@ -216,11 +216,40 @@ namespace OrbitBackend.Services
             return MapToResponseDto(clip);
         }
 
-        public async Task RecordClipViewAsync(int clipId)
+        public async Task RecordClipViewAsync(int clipId, string? userId, string? sessionId)
         {
             var clip = await _context.Clips.FirstOrDefaultAsync(c => c.Id == clipId)
                 ?? throw new InvalidOperationException("Clip not found.");
 
+            // Check for duplicate view by authenticated user
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var alreadyViewed = await _context.ClipViews
+                    .AnyAsync(v => v.ClipId == clipId && v.UserId == userId);
+                if (alreadyViewed) return;
+            }
+            else if (!string.IsNullOrEmpty(sessionId))
+            {
+                var alreadyViewed = await _context.ClipViews
+                    .AnyAsync(v => v.ClipId == clipId && v.SessionId == sessionId);
+                if (alreadyViewed) return;
+            }
+            else
+            {
+                // No identifier — cannot deduplicate
+                return;
+            }
+
+            // Record the unique view
+            _context.ClipViews.Add(new ClipView
+            {
+                ClipId = clipId,
+                UserId = userId,
+                SessionId = sessionId,
+                ViewedAt = DateTime.UtcNow
+            });
+
+            // Increment the denormalized ViewCount for fast reads
             clip.ViewCount++;
             await _context.SaveChangesAsync();
         }

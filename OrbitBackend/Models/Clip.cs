@@ -61,5 +61,6 @@ namespace OrbitBackend.Models
         public Channel Channel { get; set; } = null!;
         public LiveStream? LiveStream { get; set; }
         public Category? Category { get; set; }
+        public ICollection<ClipView> Views { get; set; } = new List<ClipView>();
     }
 }

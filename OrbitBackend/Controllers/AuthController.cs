@@ -58,6 +58,27 @@ namespace OrbitBackend.Controllers
             return Ok(result);
         }
 
+        [HttpPost("google")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleAuthDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _authService.GoogleLoginAsync(dto);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+        }
+
         [HttpPost("forgot-password")]
         [AllowAnonymous]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]

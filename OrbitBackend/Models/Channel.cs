@@ -64,6 +64,7 @@ namespace OrbitBackend.Models
         public ICollection<ChannelSocialLink> SocialLinks { get; set; } = new List<ChannelSocialLink>();
         public ICollection<Clip> Clips { get; set; } = new List<Clip>();
         public ICollection<ChannelEmoji> CustomEmojis { get; set; } = new List<ChannelEmoji>();
+        public ICollection<ChannelFollow> Followers { get; set; } = new List<ChannelFollow>();
     }
 }
 

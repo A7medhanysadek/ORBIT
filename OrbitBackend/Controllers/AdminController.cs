@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using OrbitBackend.DTOs.Admin;
 using OrbitBackend.DTOs.Clip;
 using OrbitBackend.DTOs.Common;
+using OrbitBackend.DTOs.Streaming;
 using OrbitBackend.DTOs.Vod;
 using OrbitBackend.Services.Interfaces;
 
@@ -20,10 +21,12 @@ namespace OrbitBackend.Controllers
     public class AdminController : ControllerBase
     {
         private readonly IAdminService _adminService;
+        private readonly IMediaServerConfigService _mediaServerConfig;
 
-        public AdminController(IAdminService adminService)
+        public AdminController(IAdminService adminService, IMediaServerConfigService mediaServerConfig)
         {
             _adminService = adminService;
+            _mediaServerConfig = mediaServerConfig;
         }
 
         // ── System Stats ──
@@ -184,6 +187,36 @@ namespace OrbitBackend.Controllers
         {
             await _adminService.DeleteVodAsync(vodId);
             return Ok(new { message = "VOD deleted successfully." });
+        }
+
+        // ── Media Server Configuration ──
+
+        [HttpGet("media-server/config")]
+        [ProducesResponseType(typeof(MediaServerConfigDto), StatusCodes.Status200OK)]
+        public IActionResult GetMediaServerConfig()
+        {
+            var result = _mediaServerConfig.GetConfig();
+            return Ok(result);
+        }
+
+        [HttpPost("media-server/set-url")]
+        [ProducesResponseType(typeof(MediaServerConfigDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        public IActionResult SetMediaServerUrl([FromBody] SetMediaServerUrlDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.RtmpUrl) || string.IsNullOrWhiteSpace(dto.HlsBaseUrl))
+                return BadRequest(new { message = "Both RTMP and HLS URLs are required." });
+
+            var result = _mediaServerConfig.SetUrls(dto.RtmpUrl, dto.HlsBaseUrl);
+            return Ok(result);
+        }
+
+        [HttpPost("media-server/clear-url")]
+        [ProducesResponseType(typeof(MediaServerConfigDto), StatusCodes.Status200OK)]
+        public IActionResult ClearMediaServerUrl()
+        {
+            var result = _mediaServerConfig.ClearUrls();
+            return Ok(result);
         }
 
         private string GetCurrentUserId()

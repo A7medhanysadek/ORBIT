@@ -196,6 +196,84 @@ namespace OrbitBackend.Services
             await _userManager.UpdateAsync(user);
         }
 
+        public async Task<AuthResponseDto> GoogleLoginAsync(GoogleAuthDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Credential))
+                throw new InvalidOperationException("Google credential is required.");
+
+            // Verify Google Token via Google TokenInfo API
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync($"https://oauth2.googleapis.com/tokeninfo?id_token={Uri.EscapeDataString(dto.Credential.Trim())}");
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException("Google authentication failed or token is invalid/expired.");
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(content);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("email", out var emailProp) || string.IsNullOrEmpty(emailProp.GetString()))
+            {
+                throw new InvalidOperationException("Google token did not contain a valid email.");
+            }
+
+            var email = emailProp.GetString()!;
+            var name = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
+            var picture = root.TryGetProperty("picture", out var picProp) ? picProp.GetString() : null;
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                // Auto-register user from Google profile
+                var username = email.Split('@')[0].Replace(".", "_").Replace("-", "_");
+                var existingUserWithUsername = await _userManager.FindByNameAsync(username);
+                if (existingUserWithUsername != null)
+                {
+                    username = $"{username}_{Guid.NewGuid().ToString("N")[..4]}";
+                }
+
+                user = new AppUser
+                {
+                    UserName = username,
+                    Email = email,
+                    FullName = string.IsNullOrWhiteSpace(name) ? username : name,
+                    EmailConfirmed = true,
+                    ProfilePictureUrl = picture,
+                    Age = 18
+                };
+
+                var createResult = await _userManager.CreateAsync(user);
+                if (!createResult.Succeeded)
+                {
+                    var errors = string.Join("; ", createResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"Could not create account: {errors}");
+                }
+
+                // Check for OG badge
+                var totalUsers = await _context.Users.CountAsync();
+                if (totalUsers <= 100)
+                {
+                    user.IsOgUser = true;
+                    await _userManager.UpdateAsync(user);
+                }
+            }
+            else
+            {
+                if (!user.EmailConfirmed)
+                {
+                    user.EmailConfirmed = true;
+                }
+                if (string.IsNullOrEmpty(user.ProfilePictureUrl) && !string.IsNullOrEmpty(picture))
+                {
+                    user.ProfilePictureUrl = picture;
+                }
+                await _userManager.UpdateAsync(user);
+            }
+
+            return await BuildAuthResponseAsync(user);
+        }
+
         private static string GenerateAlphanumericOtp(int length = 6)
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

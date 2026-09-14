@@ -24,6 +24,7 @@ namespace OrbitBackend.Services
         private readonly ViewerTracker _viewerTracker;
         private readonly IHubContext<StreamChatHub> _hubContext;
         private readonly HttpClient _httpClient;
+        private readonly INotificationService _notificationService;
 
         public StreamService(
             AppDbContext context,
@@ -33,7 +34,8 @@ namespace OrbitBackend.Services
             IMediaServerConfigService mediaServerConfig,
             ViewerTracker viewerTracker,
             IHubContext<StreamChatHub> hubContext,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            INotificationService notificationService)
         {
             _context = context;
             _userManager = userManager;
@@ -43,6 +45,7 @@ namespace OrbitBackend.Services
             _viewerTracker = viewerTracker;
             _hubContext = hubContext;
             _httpClient = httpClientFactory.CreateClient();
+            _notificationService = notificationService;
         }
 
         public async Task<StreamKeyResponseDto> GenerateStreamKeyAsync(string userId)
@@ -335,6 +338,20 @@ namespace OrbitBackend.Services
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Stream {StreamId} is now LIVE for user {UserId}.", pendingStream.Id, user.Id);
+
+            // Notify all followers that this channel is now live
+            try
+            {
+                await _notificationService.NotifyFollowersStreamLiveAsync(
+                    pendingStream.Id,
+                    channel.Id,
+                    channel.ChannelName,
+                    pendingStream.Title);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send live stream notification for stream {StreamId}", pendingStream.Id);
+            }
 
             return new MarkLiveResultDto
             {

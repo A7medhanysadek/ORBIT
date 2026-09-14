@@ -16,7 +16,10 @@ namespace OrbitBackend.Data
         public DbSet<ChannelSocialLink> ChannelSocialLinks { get; set; }
         public DbSet<VodView> VodViews { get; set; }
         public DbSet<Clip> Clips { get; set; }
+        public DbSet<ClipView> ClipViews { get; set; }
         public DbSet<ChannelEmoji> ChannelEmojis { get; set; }
+        public DbSet<ChannelFollow> ChannelFollows { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
@@ -329,6 +332,51 @@ namespace OrbitBackend.Data
                 entity.HasIndex(e => new { e.CategoryId, e.ViewCount });
             });
 
+            // ── ClipView ──
+            builder.Entity<ClipView>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Clip)
+                    .WithMany(c => c.Views)
+                    .HasForeignKey(e => e.ClipId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.ClipViews)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.Property(e => e.SessionId)
+                    .HasMaxLength(200);
+
+                // Deduplication indices
+                entity.HasIndex(e => new { e.ClipId, e.UserId });
+                entity.HasIndex(e => new { e.ClipId, e.SessionId });
+            });
+
+            // ── ChannelFollow ──
+            builder.Entity<ChannelFollow>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.FollowedChannels)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Channel)
+                    .WithMany(c => c.Followers)
+                    .HasForeignKey(e => e.ChannelId)
+                    .OnDelete(DeleteBehavior.NoAction); // Avoid multiple cascade paths
+
+                // Each user can follow a channel at most once
+                entity.HasIndex(e => new { e.UserId, e.ChannelId })
+                    .IsUnique();
+
+                entity.HasIndex(e => e.ChannelId);
+            });
+
             // ── ChannelEmoji ──
             builder.Entity<ChannelEmoji>(entity =>
             {
@@ -352,6 +400,35 @@ namespace OrbitBackend.Data
                     .IsUnique();
 
                 entity.HasIndex(e => e.ChannelId);
+            });
+
+            // ── Notification ──
+            builder.Entity<Notification>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Type)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.Title)
+                    .IsRequired()
+                    .HasMaxLength(150);
+
+                entity.Property(e => e.Message)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.Data)
+                    .HasMaxLength(1000);
+
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.Notifications)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.UserId, e.IsRead });
+                entity.HasIndex(e => new { e.UserId, e.CreatedAt });
             });
         }
     }

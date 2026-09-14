@@ -29,7 +29,6 @@ namespace OrbitBackend.Hubs
     ///   - UserBanned(username) → broadcast when a user is banned
     ///   - Error(message)          → error notification
     /// </summary>
-    [Authorize]
     public class StreamChatHub : Hub
     {
         private readonly IChatService _chatService;

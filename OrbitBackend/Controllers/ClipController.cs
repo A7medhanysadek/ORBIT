@@ -80,15 +80,20 @@ namespace OrbitBackend.Controllers
         }
 
         /// <summary>
-        /// Increments the view counter for a clip when played.
+        /// Records a unique view for a clip.
+        /// Authenticated users are tracked by user ID (deduplicated).
+        /// Anonymous users can provide a sessionId query parameter for deduplication.
         /// </summary>
         [HttpPost("{clipId:int}/view")]
         [AllowAnonymous]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> RecordClipView(int clipId)
+        public async Task<IActionResult> RecordClipView(int clipId, [FromQuery] string? sessionId = null)
         {
-            await _clipService.RecordClipViewAsync(clipId);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                      ?? User.FindFirstValue("sub");
+
+            await _clipService.RecordClipViewAsync(clipId, userId, sessionId);
             return Ok(new { message = "View recorded." });
         }
 

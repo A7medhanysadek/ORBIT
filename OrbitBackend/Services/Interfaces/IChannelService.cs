@@ -67,5 +67,22 @@ namespace OrbitBackend.Services.Interfaces
         /// Searches channels by channel name, description, or owner name.
         /// </summary>
         Task<List<OrbitBackend.DTOs.Admin.ChannelSearchResultDto>> SearchChannelsAsync(string query);
+
+        // ── Following ──
+
+        /// <summary>
+        /// Toggles follow status for a channel. Returns true if now following, false if unfollowed.
+        /// </summary>
+        Task<bool> ToggleFollowAsync(string userId, int channelId);
+
+        /// <summary>
+        /// Checks if a user is following a channel.
+        /// </summary>
+        Task<bool> IsFollowingAsync(string userId, int channelId);
+
+        /// <summary>
+        /// Gets all channels the user is following.
+        /// </summary>
+        Task<List<ChannelFollowDto>> GetFollowedChannelsAsync(string userId);
     }
 }

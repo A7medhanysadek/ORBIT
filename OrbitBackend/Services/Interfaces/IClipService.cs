@@ -30,7 +30,7 @@ namespace OrbitBackend.Services.Interfaces
 
         Task<ClipResponseDto> GetClipByIdAsync(int clipId);
 
-        Task RecordClipViewAsync(int clipId);
+        Task RecordClipViewAsync(int clipId, string? userId, string? sessionId);
 
         Task DeleteClipAsync(int clipId, string userId);
     }

@@ -28,5 +28,8 @@ namespace OrbitBackend.Models
         public ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
         public ICollection<ChannelModerator> ModeratorOf { get; set; } = new List<ChannelModerator>();
         public ICollection<Clip> CreatedClips { get; set; } = new List<Clip>();
+        public ICollection<ChannelFollow> FollowedChannels { get; set; } = new List<ChannelFollow>();
+        public ICollection<ClipView> ClipViews { get; set; } = new List<ClipView>();
+        public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     }
 }

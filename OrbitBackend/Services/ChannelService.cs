@@ -15,6 +15,7 @@ namespace OrbitBackend.Services
         private readonly ICloudinaryService _cloudinaryService;
         private readonly ViewerTracker _viewerTracker;
         private readonly ILogger<ChannelService> _logger;
+        private readonly INotificationService _notificationService;
 
         public ChannelService(
             AppDbContext context,
@@ -22,7 +23,8 @@ namespace OrbitBackend.Services
             RoleManager<IdentityRole> roleManager,
             ICloudinaryService cloudinaryService,
             ViewerTracker viewerTracker,
-            ILogger<ChannelService> logger)
+            ILogger<ChannelService> logger,
+            INotificationService notificationService)
         {
             _context = context;
             _userManager = userManager;
@@ -30,6 +32,7 @@ namespace OrbitBackend.Services
             _cloudinaryService = cloudinaryService;
             _viewerTracker = viewerTracker;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
         public async Task<ChannelResponseDto> CreateChannelAsync(string userId, CreateChannelDto dto)
@@ -82,6 +85,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
                 .Include(c => c.SocialLinks)
+                .Include(c => c.Followers)
                 .FirstOrDefaultAsync(c => c.Id == channelId)
                 ?? throw new InvalidOperationException("Channel not found.");
 
@@ -95,6 +99,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
                 .Include(c => c.SocialLinks)
+                .Include(c => c.Followers)
                 .FirstOrDefaultAsync(c => c.OwnerId == userId)
                 ?? throw new InvalidOperationException("You don't have a channel. Create one first using POST /api/channel/create.");
 
@@ -133,6 +138,16 @@ namespace OrbitBackend.Services
             if (!await _userManager.IsInRoleAsync(targetUser, "Moderator"))
             {
                 await _userManager.AddToRoleAsync(targetUser, "Moderator");
+            }
+
+            // Notify user that they were hired as a moderator
+            try
+            {
+                await _notificationService.NotifyModeratorHiredAsync(targetUser.Id, channel.ChannelName, channel.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send mod notification to user {UserId}", targetUser.Id);
             }
 
             _logger.LogInformation(
@@ -206,6 +221,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
                 .Include(c => c.SocialLinks)
+                .Include(c => c.Followers)
                 .FirstOrDefaultAsync(c => c.OwnerId == userId)
                 ?? throw new InvalidOperationException("You don't have a channel.");
 
@@ -235,6 +251,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
                 .Include(c => c.SocialLinks)
+                .Include(c => c.Followers)
                 .FirstOrDefaultAsync(c => c.OwnerId == userId)
                 ?? throw new InvalidOperationException("You don't have a channel.");
 
@@ -262,6 +279,7 @@ namespace OrbitBackend.Services
                 .Include(c => c.Moderators)
                 .Include(c => c.LiveStreams)
                 .Include(c => c.SocialLinks)
+                .Include(c => c.Followers)
                 .FirstOrDefaultAsync(c => c.OwnerId == userId)
                 ?? throw new InvalidOperationException("You don't have a channel.");
 
@@ -365,6 +383,82 @@ namespace OrbitBackend.Services
             }).ToList();
         }
 
+        // ── Following ──
+
+        public async Task<bool> ToggleFollowAsync(string userId, int channelId)
+        {
+            var channel = await _context.Channels.FirstOrDefaultAsync(c => c.Id == channelId)
+                ?? throw new InvalidOperationException("Channel not found.");
+
+            if (channel.OwnerId == userId)
+                throw new InvalidOperationException("You cannot follow your own channel.");
+
+            var existingFollow = await _context.ChannelFollows
+                .FirstOrDefaultAsync(f => f.ChannelId == channelId && f.UserId == userId);
+
+            if (existingFollow != null)
+            {
+                _context.ChannelFollows.Remove(existingFollow);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("User {UserId} unfollowed channel {ChannelId}.", userId, channelId);
+                return false;
+            }
+
+            var follow = new ChannelFollow
+            {
+                ChannelId = channelId,
+                UserId = userId,
+                FollowedAt = DateTime.UtcNow
+            };
+
+            _context.ChannelFollows.Add(follow);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("User {UserId} followed channel {ChannelId}.", userId, channelId);
+
+            // Notify channel owner of new follower
+            try
+            {
+                var followerUser = await _userManager.FindByIdAsync(userId);
+                if (followerUser != null)
+                {
+                    await _notificationService.NotifyNewFollowerAsync(channel.OwnerId, followerUser.UserName ?? followerUser.FullName, channel.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send new follower notification to channel owner {OwnerId}", channel.OwnerId);
+            }
+
+            return true;
+        }
+
+        public async Task<bool> IsFollowingAsync(string userId, int channelId)
+        {
+            return await _context.ChannelFollows
+                .AnyAsync(f => f.ChannelId == channelId && f.UserId == userId);
+        }
+
+        public async Task<List<ChannelFollowDto>> GetFollowedChannelsAsync(string userId)
+        {
+            return await _context.ChannelFollows
+                .Where(f => f.UserId == userId)
+                .Include(f => f.Channel)
+                    .ThenInclude(c => c.Owner)
+                .Include(f => f.Channel)
+                    .ThenInclude(c => c.LiveStreams)
+                .OrderByDescending(f => f.FollowedAt)
+                .Select(f => new ChannelFollowDto
+                {
+                    ChannelId = f.ChannelId,
+                    ChannelName = f.Channel.ChannelName,
+                    OwnerUsername = f.Channel.Owner.UserName ?? f.Channel.Owner.FullName ?? string.Empty,
+                    ProfilePhotoUrl = f.Channel.ProfilePhotoUrl,
+                    IsLive = f.Channel.LiveStreams.Any(s => s.IsLive),
+                    FollowedAt = f.FollowedAt
+                })
+                .ToListAsync();
+        }
+
         private static ChannelResponseDto MapToResponseDto(Channel channel, AppUser owner)
         {
             return new ChannelResponseDto
@@ -383,6 +477,7 @@ namespace OrbitBackend.Services
                 DonationUrl = channel.DonationUrl,
                 DonationMessage = channel.DonationMessage,
                 SaveStreams = channel.SaveStreams,
+                FollowerCount = channel.Followers?.Count ?? 0,
                 SocialLinks = channel.SocialLinks?.Select(sl => new ChannelSocialLinkDto
                 {
                     Platform = sl.Platform,

@@ -259,6 +259,51 @@ namespace OrbitBackend.Controllers
             return Ok(result);
         }
 
+        // ── Following ──
+
+        /// <summary>
+        /// Toggles following a channel. If currently following, unfollows. If not following, follows.
+        /// </summary>
+        [HttpPost("{id:int}/follow")]
+        [Authorize]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> ToggleFollow(int id)
+        {
+            var userId = GetUserId();
+            var isFollowing = await _channelService.ToggleFollowAsync(userId, id);
+            return Ok(new { isFollowing, channelId = id });
+        }
+
+        /// <summary>
+        /// Checks if the authenticated user is following a channel.
+        /// </summary>
+        [HttpGet("{id:int}/following")]
+        [Authorize]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> IsFollowing(int id)
+        {
+            var userId = GetUserId();
+            var isFollowing = await _channelService.IsFollowingAsync(userId, id);
+            return Ok(new { isFollowing, channelId = id });
+        }
+
+        /// <summary>
+        /// Gets the list of channels followed by the authenticated user.
+        /// </summary>
+        [HttpGet("following")]
+        [Authorize]
+        [ProducesResponseType(typeof(List<ChannelFollowDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetFollowedChannels()
+        {
+            var userId = GetUserId();
+            var followed = await _channelService.GetFollowedChannelsAsync(userId);
+            return Ok(followed);
+        }
+
         private string GetUserId()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)

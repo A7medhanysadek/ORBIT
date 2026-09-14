@@ -12,5 +12,6 @@ namespace OrbitBackend.Services.Interfaces
         Task RevokeTokenAsync(string userId);
         Task ForgotPasswordAsync(ForgotPasswordDto dto);
         Task ResetPasswordAsync(ResetPasswordDto dto);
+        Task<AuthResponseDto> GoogleLoginAsync(GoogleAuthDto dto);
     }
 }

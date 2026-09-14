@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OrbitBackend.Data;
 
@@ -11,9 +12,11 @@ using OrbitBackend.Data;
 namespace OrbitBackend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914101112_AddClipViewAndChannelFollow")]
+    partial class AddClipViewAndChannelFollow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -743,52 +746,6 @@ namespace OrbitBackend.Migrations
                     b.ToTable("LiveStreams");
                 });
 
-            modelBuilder.Entity("OrbitBackend.Models.Notification", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Data")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "CreatedAt");
-
-                    b.HasIndex("UserId", "IsRead");
-
-                    b.ToTable("Notifications");
-                });
-
             modelBuilder.Entity("OrbitBackend.Models.VodView", b =>
                 {
                     b.Property<long>("Id")
@@ -1093,17 +1050,6 @@ namespace OrbitBackend.Migrations
                     b.Navigation("Streamer");
                 });
 
-            modelBuilder.Entity("OrbitBackend.Models.Notification", b =>
-                {
-                    b.HasOne("OrbitBackend.Models.AppUser", "User")
-                        .WithMany("Notifications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("OrbitBackend.Models.VodView", b =>
                 {
                     b.HasOne("OrbitBackend.Models.LiveStream", "LiveStream")
@@ -1137,8 +1083,6 @@ namespace OrbitBackend.Migrations
                     b.Navigation("LiveStreams");
 
                     b.Navigation("ModeratorOf");
-
-                    b.Navigation("Notifications");
                 });
 
             modelBuilder.Entity("OrbitBackend.Models.Category", b =>

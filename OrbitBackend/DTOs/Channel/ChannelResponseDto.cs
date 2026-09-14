@@ -18,6 +18,7 @@ namespace OrbitBackend.DTOs.Channel
         public string? DonationUrl { get; set; }
         public string? DonationMessage { get; set; }
         public bool SaveStreams { get; set; }
+        public int FollowerCount { get; set; }
         public List<ChannelSocialLinkDto> SocialLinks { get; set; } = new();
     }
 }
