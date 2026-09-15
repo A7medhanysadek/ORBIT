@@ -26,6 +26,8 @@ namespace OrbitBackend.Services.Interfaces
         // Live Streams
         Task<List<AdminStreamDto>> GetLiveStreamsAsync();
         Task ForceEndStreamAsync(int streamId);
+        Task<AdminStreamDto> SimulateYoutubeStreamAsync(SimulateYoutubeStreamDto dto);
+        Task EndSimulatedStreamAsync(int streamId);
 
         // Content
         Task<PaginatedResponseDto<ClipResponseDto>> GetClipsAsync(int page, int pageSize);

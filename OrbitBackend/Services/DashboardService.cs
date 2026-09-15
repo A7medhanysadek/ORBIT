@@ -52,9 +52,25 @@ namespace OrbitBackend.Services
                 .ToList();
 
             double totalBroadcastSeconds = finishedStreams.Sum(s => (s.EndedAt!.Value - s.StartedAt!.Value).TotalSeconds);
-            double avgDuration = finishedStreams.Count > 0 ? totalBroadcastSeconds / finishedStreams.Count : 0;
-            int allTimePeak = allStreams.Count > 0 ? allStreams.Max(s => s.PeakViewers) : 0;
-            double avgPeak = allStreams.Count > 0 ? allStreams.Average(s => s.PeakViewers) : 0;
+
+            // Include ongoing live stream duration
+            var activeStream = allStreams.FirstOrDefault(s => s.IsLive);
+            if (activeStream != null)
+            {
+                var liveStart = activeStream.StartedAt ?? activeStream.CreatedAt;
+                totalBroadcastSeconds += Math.Max(0, (DateTime.UtcNow - liveStart).TotalSeconds);
+            }
+
+            double avgDuration = (finishedStreams.Count + (activeStream != null ? 1 : 0)) > 0
+                ? totalBroadcastSeconds / (finishedStreams.Count + (activeStream != null ? 1 : 0))
+                : 0;
+
+            int allTimePeak = allStreams.Count > 0
+                ? allStreams.Max(s => Math.Max(s.PeakViewers, _viewerTracker.GetPeakViewerCount(s.Id)))
+                : 0;
+            double avgPeak = allStreams.Count > 0
+                ? allStreams.Average(s => Math.Max(s.PeakViewers, _viewerTracker.GetPeakViewerCount(s.Id)))
+                : 0;
             int totalVodViews = allStreams.Sum(s => s.VodViews.Count);
             int totalChatMessages = allStreams.Sum(s => s.ChatMessages.Count);
 

@@ -293,6 +293,24 @@ namespace OrbitBackend.Services
                     "Stream {StreamId} RECONNECTED for user {UserId}. Session continues.",
                     disconnectedStream.Id, user.Id);
 
+                // Broadcast stream reconnected / live event to room
+                try
+                {
+                    var hlsUrl = $"{_mediaServerConfig.GetHlsBaseUrl()}/{channel.StreamKey}.m3u8";
+                    await _hubContext.Clients.Group($"stream_{disconnectedStream.Id}").SendAsync("StreamStarted", new
+                    {
+                        streamId = disconnectedStream.Id,
+                        isLive = true,
+                        hlsUrl = hlsUrl,
+                        title = disconnectedStream.Title,
+                        categoryName = disconnectedStream.Category?.Name
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to broadcast StreamStarted for reconnected stream {StreamId}", disconnectedStream.Id);
+                }
+
                 return new MarkLiveResultDto
                 {
                     StreamId = disconnectedStream.Id,
@@ -316,6 +334,23 @@ namespace OrbitBackend.Services
                     "Stream {StreamId} RECONNECTED (nginx grace period) for user {UserId}. Session continues.",
                     activeStream.Id, user.Id);
 
+                try
+                {
+                    var hlsUrl = $"{_mediaServerConfig.GetHlsBaseUrl()}/{channel.StreamKey}.m3u8";
+                    await _hubContext.Clients.Group($"stream_{activeStream.Id}").SendAsync("StreamStarted", new
+                    {
+                        streamId = activeStream.Id,
+                        isLive = true,
+                        hlsUrl = hlsUrl,
+                        title = activeStream.Title,
+                        categoryName = activeStream.Category?.Name
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to broadcast StreamStarted for grace period stream {StreamId}", activeStream.Id);
+                }
+
                 return new MarkLiveResultDto
                 {
                     StreamId = activeStream.Id,
@@ -338,6 +373,24 @@ namespace OrbitBackend.Services
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Stream {StreamId} is now LIVE for user {UserId}.", pendingStream.Id, user.Id);
+
+            // Broadcast stream live event to all connected watchers in the stream chat group
+            try
+            {
+                var hlsUrl = $"{_mediaServerConfig.GetHlsBaseUrl()}/{channel.StreamKey}.m3u8";
+                await _hubContext.Clients.Group($"stream_{pendingStream.Id}").SendAsync("StreamStarted", new
+                {
+                    streamId = pendingStream.Id,
+                    isLive = true,
+                    hlsUrl = hlsUrl,
+                    title = pendingStream.Title,
+                    categoryName = pendingStream.Category?.Name
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast StreamStarted for stream {StreamId}", pendingStream.Id);
+            }
 
             // Notify all followers that this channel is now live
             try
@@ -512,22 +565,34 @@ namespace OrbitBackend.Services
                 .Include(s => s.Category)
                 .ToListAsync();
 
-            return liveStreams.Select(s => new LiveStreamSummaryDto
+            return liveStreams.Select(s =>
             {
-                Id = s.Id,
-                Title = s.Title,
-                Description = s.Description,
-                StreamerName = s.Streamer.FullName,
-                ChannelName = s.Channel.ChannelName,
-                ChannelId = s.ChannelId,
-                HlsUrl = $"{hlsBaseUrl}/{s.Channel.StreamKey}.m3u8",
-                ThumbnailUrl = s.ThumbnailUrl,
-                StartedAt = s.StartedAt,
-                CategoryId = s.CategoryId,
-                CategoryName = s.Category?.Name,
-                CategorySlug = s.Category?.Slug,
-                IsReconnecting = s.DisconnectedAt != null,
-                ViewerCount = _viewerTracker.GetViewerCount(s.Id)
+                var (ytUrl, ytId, cleanDesc) = ParseYoutubeSimulated(s.Description);
+                var isSimulated = !string.IsNullOrEmpty(ytUrl);
+                var effectiveHls = isSimulated ? ytUrl : $"{hlsBaseUrl}/{s.Channel.StreamKey}.m3u8";
+                var effectiveThumb = isSimulated && !string.IsNullOrEmpty(ytId)
+                    ? $"https://img.youtube.com/vi/{ytId}/hqdefault.jpg"
+                    : (s.ThumbnailUrl ?? $"{hlsBaseUrl}/{s.Channel.StreamKey}-preview.jpg");
+
+                return new LiveStreamSummaryDto
+                {
+                    Id = s.Id,
+                    Title = s.Title,
+                    Description = cleanDesc,
+                    StreamerName = s.Streamer.FullName,
+                    ChannelName = s.Channel.ChannelName,
+                    ChannelId = s.ChannelId,
+                    HlsUrl = effectiveHls,
+                    ThumbnailUrl = effectiveThumb,
+                    YoutubeUrl = ytUrl,
+                    IsSimulated = isSimulated,
+                    StartedAt = s.StartedAt,
+                    CategoryId = s.CategoryId,
+                    CategoryName = s.Category?.Name,
+                    CategorySlug = s.Category?.Slug,
+                    IsReconnecting = s.DisconnectedAt != null,
+                    ViewerCount = _viewerTracker.GetViewerCount(s.Id)
+                };
             }).ToList();
         }
 
@@ -686,7 +751,7 @@ namespace OrbitBackend.Services
 
                 try
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
                     var response = await _httpClient.PostAsJsonAsync(mergeUrl, payload, cts.Token);
                     if (response.IsSuccessStatusCode)
                     {
@@ -932,6 +997,25 @@ namespace OrbitBackend.Services
                 : $"{ts.Minutes:D2}:{ts.Seconds:D2}";
         }
 
+        private static (string? youtubeUrl, string? videoId, string cleanDescription) ParseYoutubeSimulated(string? description)
+        {
+            if (string.IsNullOrEmpty(description)) return (null, null, string.Empty);
+            var match = Regex.Match(description, @"\[YOUTUBE_SIMULATED:(.*?)\]");
+            if (!match.Success) return (null, null, description);
+
+            var url = match.Groups[1].Value.Trim();
+            var clean = description.Replace(match.Value, "").Trim();
+
+            string? videoId = null;
+            var idMatch = Regex.Match(url, @"(?:v=|\/live\/|\/embed\/|youtu\.be\/|\/v\/)([^?&/]+)");
+            if (idMatch.Success)
+            {
+                videoId = idMatch.Groups[1].Value;
+            }
+
+            return (url, videoId, clean);
+        }
+
         private StreamResponseDto MapToResponseDto(LiveStream stream, AppUser streamer, Channel channel)
         {
             var hlsBaseUrl = _mediaServerConfig.GetHlsBaseUrl();
@@ -945,14 +1029,23 @@ namespace OrbitBackend.Services
                 vodUrl = $"{recordingsBaseUrl}/{stream.RecordingFileName}";
             }
 
+            var (ytUrl, ytId, cleanDesc) = ParseYoutubeSimulated(stream.Description);
+            var isSimulated = !string.IsNullOrEmpty(ytUrl);
+            var effectiveHls = isSimulated ? ytUrl : (stream.IsLive ? $"{hlsBaseUrl}/{channel.StreamKey}.m3u8" : null);
+            var effectiveThumb = isSimulated && !string.IsNullOrEmpty(ytId)
+                ? $"https://img.youtube.com/vi/{ytId}/hqdefault.jpg"
+                : (stream.ThumbnailUrl ?? (stream.IsLive ? $"{hlsBaseUrl}/{channel.StreamKey}-preview.jpg" : null));
+
             return new StreamResponseDto
             {
                 Id = stream.Id,
                 Title = stream.Title,
-                Description = stream.Description,
+                Description = cleanDesc,
                 IsLive = stream.IsLive,
-                HlsUrl = stream.IsLive ? $"{hlsBaseUrl}/{channel.StreamKey}.m3u8" : null,
-                ThumbnailUrl = stream.ThumbnailUrl,
+                HlsUrl = effectiveHls,
+                ThumbnailUrl = effectiveThumb,
+                YoutubeUrl = ytUrl,
+                IsSimulated = isSimulated,
                 VodUrl = vodUrl,
                 DisconnectedAt = stream.DisconnectedAt,
                 ViewerCount = _viewerTracker.GetViewerCount(stream.Id),

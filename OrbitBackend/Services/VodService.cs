@@ -44,6 +44,8 @@ namespace OrbitBackend.Services
                     && (s.RecordingFileName != null || s.Channel.SaveStreams))
                 .Include(s => s.Category)
                 .Include(s => s.Channel)
+                .Include(s => s.VodViews)
+                .Include(s => s.ChatMessages)
                 .OrderByDescending(s => s.EndedAt)
                 .ToListAsync();
 

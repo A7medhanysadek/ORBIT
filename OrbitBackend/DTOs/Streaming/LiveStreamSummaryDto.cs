@@ -26,5 +26,8 @@ namespace OrbitBackend.DTOs.Streaming
         /// Number of viewers currently watching this stream in real-time.
         /// </summary>
         public int ViewerCount { get; set; }
+
+        public string? YoutubeUrl { get; set; }
+        public bool IsSimulated { get; set; }
     }
 }

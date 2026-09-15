@@ -1,12 +1,15 @@
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using AutoMapper;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using OrbitBackend.Data;
 using OrbitBackend.DTOs.Admin;
 using OrbitBackend.DTOs.Clip;
 using OrbitBackend.DTOs.Common;
 using OrbitBackend.DTOs.Vod;
+using OrbitBackend.Hubs;
 using OrbitBackend.Models;
 using OrbitBackend.Services.Interfaces;
 
@@ -19,19 +22,22 @@ namespace OrbitBackend.Services
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ViewerTracker _viewerTracker;
         private readonly IMapper _mapper;
+        private readonly IHubContext<StreamChatHub> _hubContext;
 
         public AdminService(
             AppDbContext context,
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
             ViewerTracker viewerTracker,
-            IMapper mapper)
+            IMapper mapper,
+            IHubContext<StreamChatHub> hubContext)
         {
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
             _viewerTracker = viewerTracker;
             _mapper = mapper;
+            _hubContext = hubContext;
         }
 
         public async Task<AdminStatsDto> GetSystemStatsAsync()
@@ -344,17 +350,28 @@ namespace OrbitBackend.Services
                 .AsNoTracking()
                 .ToListAsync();
 
-            return liveStreams.Select(s => new AdminStreamDto
+            return liveStreams.Select(s =>
             {
-                StreamId = s.Id,
-                ChannelId = s.ChannelId,
-                ChannelName = s.Channel?.ChannelName ?? "Unknown",
-                StreamerName = s.Channel?.Owner?.UserName ?? s.Channel?.Owner?.FullName ?? "Unknown",
-                Title = s.Title,
-                ViewerCount = _viewerTracker.GetViewerCount(s.Id),
-                StartedAt = s.StartedAt ?? s.CreatedAt,
-                CategoryName = s.Category?.Name,
-                ThumbnailUrl = s.ThumbnailUrl
+                var (ytUrl, ytId, cleanDesc) = ParseYoutubeSimulated(s.Description);
+                var isSim = !string.IsNullOrEmpty(ytUrl);
+                var thumb = isSim && !string.IsNullOrEmpty(ytId)
+                    ? $"https://img.youtube.com/vi/{ytId}/hqdefault.jpg"
+                    : s.ThumbnailUrl;
+
+                return new AdminStreamDto
+                {
+                    StreamId = s.Id,
+                    ChannelId = s.ChannelId,
+                    ChannelName = s.Channel?.ChannelName ?? "Unknown",
+                    StreamerName = s.Channel?.Owner?.UserName ?? s.Channel?.Owner?.FullName ?? "Unknown",
+                    Title = string.IsNullOrWhiteSpace(cleanDesc) ? s.Title : cleanDesc,
+                    ViewerCount = _viewerTracker.GetViewerCount(s.Id),
+                    StartedAt = s.StartedAt ?? s.CreatedAt,
+                    CategoryName = s.Category?.Name,
+                    ThumbnailUrl = thumb,
+                    IsSimulated = isSim,
+                    YoutubeUrl = ytUrl
+                };
             })
             .OrderByDescending(s => s.ViewerCount)
             .ToList();
@@ -371,7 +388,143 @@ namespace OrbitBackend.Services
                 stream.EndedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 _viewerTracker.ClearStream(streamId);
+
+                try
+                {
+                    await _hubContext.Clients.Group($"stream_{streamId}").SendAsync("StreamEnded", streamId);
+                }
+                catch { }
             }
+        }
+
+        public async Task<AdminStreamDto> SimulateYoutubeStreamAsync(SimulateYoutubeStreamDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.YoutubeUrl))
+            {
+                throw new ArgumentException("YouTube live URL is required.");
+            }
+
+            var channel = await _context.Channels
+                .Include(c => c.Owner)
+                .FirstOrDefaultAsync(c => c.Id == dto.ChannelId)
+                ?? throw new KeyNotFoundException("Target channel not found.");
+
+            // Terminate any active stream on this channel
+            var activeStreams = await _context.LiveStreams
+                .Where(s => s.ChannelId == dto.ChannelId && s.IsLive)
+                .ToListAsync();
+
+            foreach (var s in activeStreams)
+            {
+                s.IsLive = false;
+                s.EndedAt = DateTime.UtcNow;
+                _viewerTracker.ClearStream(s.Id);
+                try
+                {
+                    await _hubContext.Clients.Group($"stream_{s.Id}").SendAsync("StreamEnded", s.Id);
+                }
+                catch { }
+            }
+
+            var title = string.IsNullOrWhiteSpace(dto.Title) ? $"{channel.ChannelName} Live Broadcast" : dto.Title.Trim();
+            var simulatedStream = new LiveStream
+            {
+                ChannelId = channel.Id,
+                StreamerId = channel.OwnerId,
+                Title = title,
+                Description = $"[YOUTUBE_SIMULATED:{dto.YoutubeUrl.Trim()}] {title}",
+                CategoryId = dto.CategoryId,
+                IsLive = true,
+                StartedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                RecordingFileName = null // Explicitly no VOD saving for simulation test
+            };
+
+            _context.LiveStreams.Add(simulatedStream);
+            await _context.SaveChangesAsync();
+
+            string? catName = null;
+            if (dto.CategoryId.HasValue)
+            {
+                var cat = await _context.Categories.FindAsync(dto.CategoryId.Value);
+                catName = cat?.Name;
+            }
+
+            var (ytUrl, ytId, _) = ParseYoutubeSimulated(simulatedStream.Description);
+            var thumb = !string.IsNullOrEmpty(ytId)
+                ? $"https://img.youtube.com/vi/{ytId}/hqdefault.jpg"
+                : null;
+
+            // Broadcast SignalR StreamStarted so viewers in room switch immediately
+            try
+            {
+                await _hubContext.Clients.Group($"stream_{simulatedStream.Id}").SendAsync("StreamStarted", new
+                {
+                    streamId = simulatedStream.Id,
+                    isLive = true,
+                    hlsUrl = ytUrl,
+                    youtubeUrl = ytUrl,
+                    isSimulated = true,
+                    title = simulatedStream.Title,
+                    categoryName = catName
+                });
+            }
+            catch { }
+
+            return new AdminStreamDto
+            {
+                StreamId = simulatedStream.Id,
+                ChannelId = channel.Id,
+                ChannelName = channel.ChannelName,
+                StreamerName = channel.Owner?.UserName ?? channel.Owner?.FullName ?? "Unknown",
+                Title = simulatedStream.Title,
+                ViewerCount = 0,
+                StartedAt = simulatedStream.StartedAt ?? DateTime.UtcNow,
+                CategoryName = catName,
+                ThumbnailUrl = thumb,
+                IsSimulated = true,
+                YoutubeUrl = ytUrl
+            };
+        }
+
+        public async Task EndSimulatedStreamAsync(int streamId)
+        {
+            var stream = await _context.LiveStreams.FindAsync(streamId)
+                ?? throw new KeyNotFoundException("Live stream not found.");
+
+            if (stream.IsLive)
+            {
+                stream.IsLive = false;
+                stream.EndedAt = DateTime.UtcNow;
+                stream.RecordingFileName = null; // Guarantee no VOD
+                await _context.SaveChangesAsync();
+                _viewerTracker.ClearStream(streamId);
+
+                try
+                {
+                    await _hubContext.Clients.Group($"stream_{streamId}").SendAsync("StreamEnded", streamId);
+                }
+                catch { }
+            }
+        }
+
+        private static (string? youtubeUrl, string? videoId, string cleanDescription) ParseYoutubeSimulated(string? description)
+        {
+            if (string.IsNullOrEmpty(description)) return (null, null, string.Empty);
+            var match = Regex.Match(description, @"\[YOUTUBE_SIMULATED:(.*?)\]");
+            if (!match.Success) return (null, null, description);
+
+            var url = match.Groups[1].Value.Trim();
+            var clean = description.Replace(match.Value, "").Trim();
+
+            string? videoId = null;
+            var idMatch = Regex.Match(url, @"(?:v=|\/live\/|\/embed\/|youtu\.be\/|\/v\/)([^?&/]+)");
+            if (idMatch.Success)
+            {
+                videoId = idMatch.Groups[1].Value;
+            }
+
+            return (url, videoId, clean);
         }
 
         public async Task<PaginatedResponseDto<ClipResponseDto>> GetClipsAsync(int page, int pageSize)

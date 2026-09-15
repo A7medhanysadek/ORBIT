@@ -38,5 +38,8 @@ namespace OrbitBackend.DTOs.Streaming
         public int? CategoryId { get; set; }
         public string? CategoryName { get; set; }
         public string? CategorySlug { get; set; }
+
+        public string? YoutubeUrl { get; set; }
+        public bool IsSimulated { get; set; }
     }
 }

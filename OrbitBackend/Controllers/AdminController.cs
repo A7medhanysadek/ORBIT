@@ -153,6 +153,24 @@ namespace OrbitBackend.Controllers
             return Ok(new { message = "Live stream force-terminated successfully." });
         }
 
+        [HttpPost("simulate-youtube-stream")]
+        [ProducesResponseType(typeof(AdminStreamDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> SimulateYoutubeStream([FromBody] SimulateYoutubeStreamDto dto)
+        {
+            var result = await _adminService.SimulateYoutubeStreamAsync(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("streams/{streamId:int}/end-simulated")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> EndSimulatedStream(int streamId)
+        {
+            await _adminService.EndSimulatedStreamAsync(streamId);
+            return Ok(new { message = "Simulated stream ended successfully." });
+        }
+
         // ── Content Moderation (Clips & VODs) ──
 
         [HttpGet("clips")]

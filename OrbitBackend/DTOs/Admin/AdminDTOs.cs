@@ -70,6 +70,8 @@ namespace OrbitBackend.DTOs.Admin
         public DateTime StartedAt { get; set; }
         public string? CategoryName { get; set; }
         public string? ThumbnailUrl { get; set; }
+        public bool IsSimulated { get; set; }
+        public string? YoutubeUrl { get; set; }
     }
 
     public class ChannelSearchResultDto
@@ -82,5 +84,13 @@ namespace OrbitBackend.DTOs.Admin
         public bool IsLive { get; set; }
         public int ViewerCount { get; set; }
         public string? CategoryName { get; set; }
+    }
+
+    public class SimulateYoutubeStreamDto
+    {
+        public int ChannelId { get; set; }
+        public string YoutubeUrl { get; set; } = string.Empty;
+        public string? Title { get; set; }
+        public int? CategoryId { get; set; }
     }
 }
