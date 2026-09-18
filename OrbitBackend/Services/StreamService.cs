@@ -661,6 +661,25 @@ namespace OrbitBackend.Services
             {
                 return epoch;
             }
+
+            var patternDate = "^" + Regex.Escape(streamKey) + @".*?(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})";
+            var matchDate = Regex.Match(fileName, patternDate);
+            if (matchDate.Success)
+            {
+                try
+                {
+                    int y = int.Parse(matchDate.Groups[1].Value);
+                    int m = int.Parse(matchDate.Groups[2].Value);
+                    int d = int.Parse(matchDate.Groups[3].Value);
+                    int h = int.Parse(matchDate.Groups[4].Value);
+                    int min = int.Parse(matchDate.Groups[5].Value);
+                    int s = int.Parse(matchDate.Groups[6].Value);
+                    var dt = new DateTime(y, m, d, h, min, s, DateTimeKind.Utc);
+                    return new DateTimeOffset(dt).ToUnixTimeSeconds();
+                }
+                catch { }
+            }
+
             return null;
         }
 
@@ -730,7 +749,7 @@ namespace OrbitBackend.Services
                             File = f,
                             Epoch = ExtractRecordingEpoch(f.Name, channel.StreamKey) ?? new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeSeconds()
                         })
-                        .Where(x => x.Epoch >= (sessionStartEpoch - 60) && x.Epoch <= (sessionEndEpoch + 60))
+                        .Where(x => x.Epoch >= (sessionStartEpoch - 300) && x.Epoch <= (sessionEndEpoch + 300))
                         .OrderBy(x => x.Epoch)
                         .Select(x => x.File)
                         .ToList();

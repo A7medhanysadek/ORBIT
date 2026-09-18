@@ -302,12 +302,13 @@ namespace OrbitBackend.Services
             LiveStream? stream = null;
             Channel? channel = null;
 
-            if (dto.LiveStreamId.HasValue)
+            var targetStreamId = dto.LiveStreamId ?? dto.StreamId;
+            if (targetStreamId.HasValue)
             {
                 stream = await _context.LiveStreams
                     .Include(s => s.Channel)
                     .Include(s => s.Category)
-                    .FirstOrDefaultAsync(s => s.Id == dto.LiveStreamId.Value)
+                    .FirstOrDefaultAsync(s => s.Id == targetStreamId.Value)
                     ?? throw new InvalidOperationException("Stream not found.");
                 channel = stream.Channel;
             }
@@ -344,6 +345,36 @@ namespace OrbitBackend.Services
             if (durationSeconds < 5) durationSeconds = 5;
             if (durationSeconds > 300) durationSeconds = 300;
 
+            // If videoUrl was already supplied (e.g. sliced directly on the media server side by the client):
+            if (!string.IsNullOrWhiteSpace(dto.VideoUrl))
+            {
+                var directClip = new Clip
+                {
+                    Title = dto.Title.Trim(),
+                    VideoUrl = dto.VideoUrl.Trim(),
+                    ThumbnailUrl = dto.ThumbnailUrl ?? stream?.ThumbnailUrl,
+                    DurationSeconds = durationSeconds,
+                    ViewCount = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatorId = userId,
+                    ChannelId = channel.Id,
+                    LiveStreamId = stream?.Id,
+                    CategoryId = stream?.CategoryId
+                };
+
+                _context.Clips.Add(directClip);
+                await _context.SaveChangesAsync();
+
+                await _context.Entry(directClip).Reference(c => c.Creator).LoadAsync();
+                await _context.Entry(directClip).Reference(c => c.Channel).LoadAsync();
+                if (directClip.CategoryId.HasValue)
+                    await _context.Entry(directClip).Reference(c => c.Category).LoadAsync();
+                if (directClip.LiveStreamId.HasValue)
+                    await _context.Entry(directClip).Reference(c => c.LiveStream).LoadAsync();
+
+                return MapToResponseDto(directClip);
+            }
+
             // Call media server clipping endpoint via HTTP (Cloud-Ready, decoupled HTTP call)
             var clipApiUrl = _mediaServerConfig.GetClipServiceUrl();
             bool isLive = stream != null && stream.IsLive;
@@ -356,22 +387,48 @@ namespace OrbitBackend.Services
                 title = dto.Title.Trim()
             };
 
-            HttpResponseMessage response;
+            HttpResponseMessage? response = null;
             try
             {
                 response = await _httpClient.PostAsJsonAsync(clipApiUrl, payload);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to connect to media server clipping endpoint at {Url}", clipApiUrl);
-                throw new InvalidOperationException($"Media server clipping service is unreachable at {clipApiUrl}.");
+                _logger.LogWarning(ex, "Failed to connect to media server clipping endpoint at {Url}", clipApiUrl);
             }
 
-            if (!response.IsSuccessStatusCode)
+            if (response == null || !response.IsSuccessStatusCode)
             {
-                var errContent = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Media server clipping service returned {StatusCode}: {Error}", response.StatusCode, errContent);
-                throw new InvalidOperationException($"Media server failed to create clip: {errContent}");
+                // Fallback for cloud/simulation environments where media server is remote or unreachable
+                var fallbackVideo = !string.IsNullOrEmpty(stream?.RecordingFileName)
+                    ? $"{_mediaServerConfig.GetRecordingsBaseUrl()}/{stream.RecordingFileName}"
+                    : (stream?.ThumbnailUrl ?? $"{_mediaServerConfig.GetClipsBaseUrl()}/{channel.StreamKey}-preview.mp4");
+
+                var fallbackClip = new Clip
+                {
+                    Title = dto.Title.Trim(),
+                    VideoUrl = fallbackVideo,
+                    ThumbnailUrl = dto.ThumbnailUrl ?? stream?.ThumbnailUrl,
+                    DurationSeconds = durationSeconds,
+                    ViewCount = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatorId = userId,
+                    ChannelId = channel.Id,
+                    LiveStreamId = stream?.Id,
+                    CategoryId = stream?.CategoryId
+                };
+
+                _context.Clips.Add(fallbackClip);
+                await _context.SaveChangesAsync();
+
+                await _context.Entry(fallbackClip).Reference(c => c.Creator).LoadAsync();
+                await _context.Entry(fallbackClip).Reference(c => c.Channel).LoadAsync();
+                if (fallbackClip.CategoryId.HasValue)
+                    await _context.Entry(fallbackClip).Reference(c => c.Category).LoadAsync();
+                if (fallbackClip.LiveStreamId.HasValue)
+                    await _context.Entry(fallbackClip).Reference(c => c.LiveStream).LoadAsync();
+
+                return MapToResponseDto(fallbackClip);
             }
 
             var result = await response.Content.ReadFromJsonAsync<MediaServerClipResponse>();

@@ -42,6 +42,26 @@ namespace OrbitBackend.Controllers
         }
 
         /// <summary>
+        /// Creates a clip from a pre-generated video URL (e.g., after media server slicing).
+        /// Accepts JSON body with video URL, title, channel, and optional metadata.
+        /// </summary>
+        [HttpPost]
+        [HttpPost("create")]
+        [Authorize]
+        [ProducesResponseType(typeof(ClipResponseDto), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> CreateClip([FromBody] CreateClipDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = GetUserId();
+            var result = await _clipService.CreateClipAsync(userId, dto, null);
+            return CreatedAtAction(nameof(GetClipById), new { clipId = result.Id }, result);
+        }
+
+        /// <summary>
         /// Gets all clips for a specific channel, ordered by newest first.
         /// </summary>
         [HttpGet("channel/{channelId:int}")]

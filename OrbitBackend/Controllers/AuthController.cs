@@ -12,10 +12,12 @@ namespace OrbitBackend.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IConfiguration _config;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, IConfiguration config)
         {
             _authService = authService;
+            _config = config;
         }
 
         [HttpPost("register")]
@@ -77,6 +79,15 @@ namespace OrbitBackend.Controllers
             {
                 return Unauthorized(new { message = ex.Message });
             }
+        }
+
+        [HttpGet("google-client-id")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        public IActionResult GetGoogleClientId()
+        {
+            var clientId = _config["Google:ClientId"] ?? string.Empty;
+            return Ok(new { clientId });
         }
 
         [HttpPost("forgot-password")]

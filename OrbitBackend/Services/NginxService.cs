@@ -99,6 +99,12 @@ namespace OrbitBackend.Services
 
         public string GetControlUrl()
         {
+            lock (_lock)
+            {
+                if (!string.IsNullOrEmpty(_hlsBaseUrl))
+                    return _hlsBaseUrl.Replace("/hls", "/control");
+            }
+
             var configured = _config["Streaming:MediaServerControlUrl"];
             if (!string.IsNullOrEmpty(configured))
                 return configured.TrimEnd('/');
@@ -112,6 +118,12 @@ namespace OrbitBackend.Services
             var configured = _config["Streaming:MediaServerClipUrl"];
             if (!string.IsNullOrEmpty(configured))
                 return configured.TrimEnd('/');
+
+            lock (_lock)
+            {
+                if (!string.IsNullOrEmpty(_hlsBaseUrl))
+                    return _hlsBaseUrl.Replace("/hls", "/api/clip");
+            }
 
             var hlsBase = GetHlsBaseUrl();
             return hlsBase.Replace("/hls", "/api/clip");

@@ -24,6 +24,10 @@ namespace OrbitBackend.Configuration
             services.AddScoped<IDashboardService, DashboardService>();
             services.AddScoped<IAdminService, AdminService>();
             services.AddScoped<INotificationService, NotificationService>();
+            services.AddHttpClient("").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            });
             services.AddHttpClient();
             services.AddSingleton<ICloudinaryService, CloudinaryService>();
             services.AddSingleton<IMediaServerConfigService, MediaServerConfigService>();

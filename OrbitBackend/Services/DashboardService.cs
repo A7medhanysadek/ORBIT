@@ -47,30 +47,40 @@ namespace OrbitBackend.Services
                 .Include(s => s.ChatMessages)
                 .ToListAsync();
 
-            var finishedStreams = allStreams
-                .Where(s => s.StartedAt.HasValue && s.EndedAt.HasValue)
+            // Only count completed streams with actual saved VOD recordings
+            var vodStreams = allStreams
+                .Where(s => !string.IsNullOrEmpty(s.RecordingFileName) && s.StartedAt.HasValue && s.EndedAt.HasValue)
                 .ToList();
 
-            double totalBroadcastSeconds = finishedStreams.Sum(s => (s.EndedAt!.Value - s.StartedAt!.Value).TotalSeconds);
+            double totalBroadcastSeconds = vodStreams
+                .Sum(s => Math.Max(0, (s.EndedAt!.Value - s.StartedAt!.Value).TotalSeconds));
 
-            // Include ongoing live stream duration
+            // Include ongoing live stream duration only if live and within last 24h
             var activeStream = allStreams.FirstOrDefault(s => s.IsLive);
             if (activeStream != null)
             {
                 var liveStart = activeStream.StartedAt ?? activeStream.CreatedAt;
-                totalBroadcastSeconds += Math.Max(0, (DateTime.UtcNow - liveStart).TotalSeconds);
+                var liveElapsed = (DateTime.UtcNow - DateTime.SpecifyKind(liveStart, DateTimeKind.Utc)).TotalSeconds;
+                if (liveElapsed > 0 && liveElapsed < 86400)
+                {
+                    totalBroadcastSeconds += liveElapsed;
+                }
             }
 
-            double avgDuration = (finishedStreams.Count + (activeStream != null ? 1 : 0)) > 0
-                ? totalBroadcastSeconds / (finishedStreams.Count + (activeStream != null ? 1 : 0))
+            int countedSessions = vodStreams.Count + (activeStream != null ? 1 : 0);
+            double avgDuration = countedSessions > 0
+                ? totalBroadcastSeconds / countedSessions
                 : 0;
 
-            int allTimePeak = allStreams.Count > 0
-                ? allStreams.Max(s => Math.Max(s.PeakViewers, _viewerTracker.GetPeakViewerCount(s.Id)))
-                : 0;
-            double avgPeak = allStreams.Count > 0
-                ? allStreams.Average(s => Math.Max(s.PeakViewers, _viewerTracker.GetPeakViewerCount(s.Id)))
-                : 0;
+            var streamAudienceList = allStreams
+                .Select(s => Math.Max(s.PeakViewers, Math.Max(_viewerTracker.GetPeakViewerCount(s.Id), s.VodViews.Count)))
+                .ToList();
+
+            int allTimePeak = streamAudienceList.Count > 0 ? streamAudienceList.Max() : 0;
+            var nonZeroPeaks = streamAudienceList.Where(p => p > 0).ToList();
+            double avgPeak = nonZeroPeaks.Count > 0
+                ? nonZeroPeaks.Average()
+                : (allTimePeak > 0 ? allTimePeak : 0);
             int totalVodViews = allStreams.Sum(s => s.VodViews.Count);
             int totalChatMessages = allStreams.Sum(s => s.ChatMessages.Count);
 
@@ -141,7 +151,9 @@ namespace OrbitBackend.Services
                 return null;
 
             var now = DateTime.UtcNow;
-            var uptimeSeconds = stream.StartedAt.HasValue ? (now - stream.StartedAt.Value).TotalSeconds : 0;
+            var uptimeSeconds = stream.StartedAt.HasValue 
+                ? Math.Max(0, (now - DateTime.SpecifyKind(stream.StartedAt.Value, DateTimeKind.Utc)).TotalSeconds) 
+                : 0;
             var currentViewers = _viewerTracker.GetViewerCount(stream.Id);
             var peakViewers = Math.Max(stream.PeakViewers, _viewerTracker.GetPeakViewerCount(stream.Id));
 
@@ -159,7 +171,7 @@ namespace OrbitBackend.Services
                 CategoryImageUrl = stream.Category?.ImageUrl,
                 IsLive = stream.IsLive,
                 IsReconnecting = stream.DisconnectedAt != null,
-                StartedAt = stream.StartedAt,
+                StartedAt = stream.StartedAt.HasValue ? DateTime.SpecifyKind(stream.StartedAt.Value, DateTimeKind.Utc) : null,
                 UptimeSeconds = uptimeSeconds,
                 FormattedUptime = FormatDuration(uptimeSeconds),
                 CurrentViewerCount = currentViewers,
@@ -210,8 +222,8 @@ namespace OrbitBackend.Services
                     CategoryName = s.Category?.Name,
                     CategorySlug = s.Category?.Slug,
                     CategoryImageUrl = s.Category?.ImageUrl,
-                    StartedAt = s.StartedAt,
-                    EndedAt = s.EndedAt,
+                    StartedAt = s.StartedAt.HasValue ? DateTime.SpecifyKind(s.StartedAt.Value, DateTimeKind.Utc) : null,
+                    EndedAt = s.EndedAt.HasValue ? DateTime.SpecifyKind(s.EndedAt.Value, DateTimeKind.Utc) : null,
                     DurationSeconds = duration,
                     FormattedDuration = FormatDuration(duration),
                     PeakViewers = s.PeakViewers,

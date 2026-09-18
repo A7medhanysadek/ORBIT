@@ -159,13 +159,30 @@ namespace OrbitBackend.Services
                         if (startEpoch.HasValue && endEpoch.HasValue)
                         {
                             var pattern = "^" + Regex.Escape(streamKey) + @"-(\d{9,12})";
+                            var patternDate = "^" + Regex.Escape(streamKey) + @".*?(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})";
                             query = query.Where(f =>
                             {
+                                long ep;
                                 var m = Regex.Match(f.Name, pattern);
-                                long ep = m.Success && long.TryParse(m.Groups[1].Value, out long parsed)
-                                    ? parsed
-                                    : new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeSeconds();
-                                return ep >= (startEpoch.Value - 60) && ep <= (endEpoch.Value + 60);
+                                var mDate = Regex.Match(f.Name, patternDate);
+                                if (m.Success && long.TryParse(m.Groups[1].Value, out long parsed))
+                                {
+                                    ep = parsed;
+                                }
+                                else if (mDate.Success && int.TryParse(mDate.Groups[1].Value, out int y))
+                                {
+                                    int mo = int.Parse(mDate.Groups[2].Value);
+                                    int d = int.Parse(mDate.Groups[3].Value);
+                                    int h = int.Parse(mDate.Groups[4].Value);
+                                    int min = int.Parse(mDate.Groups[5].Value);
+                                    int s = int.Parse(mDate.Groups[6].Value);
+                                    ep = new DateTimeOffset(new DateTime(y, mo, d, h, min, s, DateTimeKind.Utc)).ToUnixTimeSeconds();
+                                }
+                                else
+                                {
+                                    ep = new DateTimeOffset(f.LastWriteTimeUtc).ToUnixTimeSeconds();
+                                }
+                                return ep >= (startEpoch.Value - 300) && ep <= (endEpoch.Value + 300);
                             });
                         }
 

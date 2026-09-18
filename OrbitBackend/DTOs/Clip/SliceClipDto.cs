@@ -14,6 +14,11 @@ namespace OrbitBackend.DTOs.Clip
         public int? LiveStreamId { get; set; }
 
         /// <summary>
+        /// Alias for LiveStreamId.
+        /// </summary>
+        public int? StreamId { get; set; }
+
+        /// <summary>
         /// ID of the channel to clip from (if LiveStreamId is omitted, uses active stream).
         /// </summary>
         public int? ChannelId { get; set; }
@@ -30,5 +35,15 @@ namespace OrbitBackend.DTOs.Clip
         /// </summary>
         [Range(5, 300, ErrorMessage = "Clip duration must be between 5 and 300 seconds (5 minutes maximum).")]
         public int? DurationSeconds { get; set; } = 60;
+
+        /// <summary>
+        /// Optional pre-generated video URL (if sliced directly via media server or externally).
+        /// </summary>
+        public string? VideoUrl { get; set; }
+
+        /// <summary>
+        /// Optional pre-generated thumbnail URL.
+        /// </summary>
+        public string? ThumbnailUrl { get; set; }
     }
 }
