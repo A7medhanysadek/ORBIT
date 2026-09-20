@@ -399,36 +399,9 @@ namespace OrbitBackend.Services
 
             if (response == null || !response.IsSuccessStatusCode)
             {
-                // Fallback for cloud/simulation environments where media server is remote or unreachable
-                var fallbackVideo = !string.IsNullOrEmpty(stream?.RecordingFileName)
-                    ? $"{_mediaServerConfig.GetRecordingsBaseUrl()}/{stream.RecordingFileName}"
-                    : (stream?.ThumbnailUrl ?? $"{_mediaServerConfig.GetClipsBaseUrl()}/{channel.StreamKey}-preview.mp4");
-
-                var fallbackClip = new Clip
-                {
-                    Title = dto.Title.Trim(),
-                    VideoUrl = fallbackVideo,
-                    ThumbnailUrl = dto.ThumbnailUrl ?? stream?.ThumbnailUrl,
-                    DurationSeconds = durationSeconds,
-                    ViewCount = 0,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatorId = userId,
-                    ChannelId = channel.Id,
-                    LiveStreamId = stream?.Id,
-                    CategoryId = stream?.CategoryId
-                };
-
-                _context.Clips.Add(fallbackClip);
-                await _context.SaveChangesAsync();
-
-                await _context.Entry(fallbackClip).Reference(c => c.Creator).LoadAsync();
-                await _context.Entry(fallbackClip).Reference(c => c.Channel).LoadAsync();
-                if (fallbackClip.CategoryId.HasValue)
-                    await _context.Entry(fallbackClip).Reference(c => c.Category).LoadAsync();
-                if (fallbackClip.LiveStreamId.HasValue)
-                    await _context.Entry(fallbackClip).Reference(c => c.LiveStream).LoadAsync();
-
-                return MapToResponseDto(fallbackClip);
+                var statusInfo = response != null ? $"HTTP {(int)response.StatusCode}" : "Connection refused / timeout";
+                _logger.LogWarning("Media server slice failed ({StatusInfo}) for URL: {Url}", statusInfo, clipApiUrl);
+                throw new InvalidOperationException($"Media server clipping service could not be reached ({statusInfo}). If you are running the streaming server locally, ensure port 8443/8085 is running or slice directly from the web client.");
             }
 
             var result = await response.Content.ReadFromJsonAsync<MediaServerClipResponse>();

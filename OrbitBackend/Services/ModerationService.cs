@@ -223,6 +223,9 @@ namespace OrbitBackend.Services
 
         public async Task<bool> HasModerationPrivilegesAsync(int channelId, string userId)
         {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null && await _userManager.IsInRoleAsync(user, "Admin")) return true;
+
             // Channel owner always has mod privileges
             var isOwner = await _context.Channels
                 .AnyAsync(c => c.Id == channelId && c.OwnerId == userId);

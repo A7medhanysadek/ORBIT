@@ -13,7 +13,7 @@ namespace OrbitBackend.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    [Authorize(Roles = "Streamer,Moderator")]
+    [Authorize(Roles = "Streamer,Moderator,Admin")]
     public class ModerationController : ControllerBase
     {
         private readonly IModerationService _moderationService;

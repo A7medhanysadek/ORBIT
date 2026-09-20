@@ -115,6 +115,12 @@ namespace OrbitBackend.Services
 
         public string GetClipServiceUrl()
         {
+            lock (_lock)
+            {
+                if (!string.IsNullOrEmpty(_hlsBaseUrl) && !_hlsBaseUrl.Contains("localhost") && !_hlsBaseUrl.Contains("127.0.0.1"))
+                    return _hlsBaseUrl.Replace("/hls", "/api/clip");
+            }
+
             var configured = _config["Streaming:MediaServerClipUrl"];
             if (!string.IsNullOrEmpty(configured))
                 return configured.TrimEnd('/');

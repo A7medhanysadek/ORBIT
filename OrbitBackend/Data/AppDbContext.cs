@@ -388,7 +388,7 @@ namespace OrbitBackend.Data
 
                 entity.Property(e => e.EmojiValue)
                     .IsRequired()
-                    .HasMaxLength(500);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.HasOne(e => e.Channel)
                     .WithMany(c => c.CustomEmojis)

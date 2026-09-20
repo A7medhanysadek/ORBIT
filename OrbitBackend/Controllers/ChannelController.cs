@@ -97,7 +97,7 @@ namespace OrbitBackend.Controllers
         /// Only the channel owner can hire moderators.
         /// </summary>
         [HttpPost("moderators/hire")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize(Roles = "Streamer,Admin")]
         [ProducesResponseType(typeof(ChannelModeratorDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -117,7 +117,7 @@ namespace OrbitBackend.Controllers
         /// Only the channel owner can remove moderators.
         /// </summary>
         [HttpDelete("moderators/{username}")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize(Roles = "Streamer,Admin")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -302,6 +302,18 @@ namespace OrbitBackend.Controllers
             var userId = GetUserId();
             var followed = await _channelService.GetFollowedChannelsAsync(userId);
             return Ok(followed);
+        }
+
+        /// <summary>
+        /// Gets custom emojis for a channel by channel ID. Public endpoint for chat & viewer clients.
+        /// </summary>
+        [HttpGet("{id:int}/emojis")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(List<OrbitBackend.DTOs.Dashboard.CustomEmojiResponseDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetChannelEmojis(int id)
+        {
+            var emojis = await _channelService.GetChannelEmojisAsync(id);
+            return Ok(emojis);
         }
 
         private string GetUserId()

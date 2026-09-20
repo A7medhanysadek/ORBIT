@@ -45,6 +45,9 @@ namespace OrbitBackend.Hubs
         // Track which stream each connection joined (for cleanup on disconnect)
         private static readonly ConcurrentDictionary<string, int> _connectionStreams = new();
 
+        // Track whether Emotes-Only mode is enabled per stream
+        private static readonly ConcurrentDictionary<int, bool> _emotesOnlyStreams = new();
+
         public StreamChatHub(
             IChatService chatService,
             IModerationService moderationService,
@@ -74,6 +77,12 @@ namespace OrbitBackend.Hubs
             // Broadcast updated viewer count
             var count = _viewerTracker.GetViewerCount(streamId);
             await Clients.Group(groupName).SendAsync("ViewerCountUpdate", streamId, count);
+
+            // Send current Emotes-Only state to joining viewer
+            if (_emotesOnlyStreams.TryGetValue(streamId, out var isEmotesOnly) && isEmotesOnly)
+            {
+                await Clients.Caller.SendAsync("EmotesOnlyToggled", true);
+            }
 
             _logger.LogDebug(
                 "Connection {ConnectionId} joined stream group {Group}. Viewers: {Count}",
@@ -151,6 +160,21 @@ namespace OrbitBackend.Hubs
                 return;
             }
 
+            // Check Emotes-Only mode if not moderator/owner
+            if (_emotesOnlyStreams.TryGetValue(streamId, out var isEmotesOnly) && isEmotesOnly)
+            {
+                var isMod = await _moderationService.HasModerationPrivilegesAsync(stream.ChannelId, userId);
+                if (!isMod)
+                {
+                    var stripped = System.Text.RegularExpressions.Regex.Replace(content, @":[a-zA-Z0-9_]+:", "").Trim();
+                    if (!string.IsNullOrEmpty(stripped))
+                    {
+                        await Clients.Caller.SendAsync("Error", "Emotes-Only mode is enabled. Only emotes can be sent.");
+                        return;
+                    }
+                }
+            }
+
             // Rate limiting
             if (!CheckRateLimit(userId))
             {
@@ -214,6 +238,40 @@ namespace OrbitBackend.Hubs
             {
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Sets or toggles Emotes-Only mode for a stream (moderators and channel owners only).
+        /// Broadcasts EmotesOnlyToggled to all viewers in the stream group.
+        /// </summary>
+        public async Task SetEmotesOnly(int streamId, bool enabled)
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                await Clients.Caller.SendAsync("Error", "You must be authenticated.");
+                return;
+            }
+
+            var stream = await _context.LiveStreams
+                .FirstOrDefaultAsync(s => s.Id == streamId);
+
+            if (stream == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Stream not found.");
+                return;
+            }
+
+            if (!await _moderationService.HasModerationPrivilegesAsync(stream.ChannelId, userId))
+            {
+                await Clients.Caller.SendAsync("Error", "You do not have permission to change chat modes.");
+                return;
+            }
+
+            _emotesOnlyStreams[streamId] = enabled;
+
+            var groupName = GetGroupName(streamId);
+            await Clients.Group(groupName).SendAsync("EmotesOnlyToggled", enabled);
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)

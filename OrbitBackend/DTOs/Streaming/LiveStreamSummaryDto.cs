@@ -29,5 +29,6 @@ namespace OrbitBackend.DTOs.Streaming
 
         public string? YoutubeUrl { get; set; }
         public bool IsSimulated { get; set; }
+        public string? ProfilePictureUrl { get; set; }
     }
 }

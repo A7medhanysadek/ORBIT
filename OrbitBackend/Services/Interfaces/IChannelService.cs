@@ -68,6 +68,11 @@ namespace OrbitBackend.Services.Interfaces
         /// </summary>
         Task<List<OrbitBackend.DTOs.Admin.ChannelSearchResultDto>> SearchChannelsAsync(string query);
 
+        /// <summary>
+        /// Gets custom emojis configured for a channel. Public method.
+        /// </summary>
+        Task<List<OrbitBackend.DTOs.Dashboard.CustomEmojiResponseDto>> GetChannelEmojisAsync(int channelId);
+
         // ── Following ──
 
         /// <summary>

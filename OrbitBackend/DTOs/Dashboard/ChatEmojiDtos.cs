@@ -18,10 +18,10 @@ namespace OrbitBackend.DTOs.Dashboard
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// The emoji character (Unicode) or URL to a custom image.
+        /// The emoji character (Unicode) or URL / base64 SVG/PNG data for a custom image.
         /// </summary>
         [Required(ErrorMessage = "Emoji value is required.")]
-        [StringLength(500, MinimumLength = 1)]
+        [MaxLength(2000000, ErrorMessage = "Emoji value is too large.")]
         public string EmojiValue { get; set; } = string.Empty;
 
         /// <summary>

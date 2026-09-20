@@ -459,6 +459,23 @@ namespace OrbitBackend.Services
                 .ToListAsync();
         }
 
+        public async Task<List<OrbitBackend.DTOs.Dashboard.CustomEmojiResponseDto>> GetChannelEmojisAsync(int channelId)
+        {
+            return await _context.ChannelEmojis
+                .AsNoTracking()
+                .Where(e => e.ChannelId == channelId)
+                .OrderBy(e => e.Name)
+                .Select(e => new OrbitBackend.DTOs.Dashboard.CustomEmojiResponseDto
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    EmojiValue = e.EmojiValue,
+                    IsCustomImage = e.IsCustomImage,
+                    CreatedAt = e.CreatedAt
+                })
+                .ToListAsync();
+        }
+
         private static ChannelResponseDto MapToResponseDto(Channel channel, AppUser owner)
         {
             return new ChannelResponseDto

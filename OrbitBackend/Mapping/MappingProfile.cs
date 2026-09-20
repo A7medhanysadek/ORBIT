@@ -59,7 +59,8 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.CategorySlug, opt => opt.MapFrom(src => src.Category != null ? src.Category.Slug : null))
                 .ForMember(dest => dest.HlsUrl, opt => opt.Ignore())
                 .ForMember(dest => dest.VodUrl, opt => opt.Ignore())
-                .ForMember(dest => dest.ViewerCount, opt => opt.Ignore());
+                .ForMember(dest => dest.ViewerCount, opt => opt.Ignore())
+                .ForMember(dest => dest.ProfilePictureUrl, opt => opt.MapFrom(src => src.Channel.ProfilePhotoUrl ?? src.Streamer.ProfilePictureUrl));
 
             CreateMap<LiveStream, LiveStreamSummaryDto>()
                 .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
@@ -70,7 +71,8 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.CategorySlug, opt => opt.MapFrom(src => src.Category != null ? src.Category.Slug : null))
                 .ForMember(dest => dest.HlsUrl, opt => opt.Ignore())
                 .ForMember(dest => dest.IsReconnecting, opt => opt.Ignore())
-                .ForMember(dest => dest.ViewerCount, opt => opt.Ignore());
+                .ForMember(dest => dest.ViewerCount, opt => opt.Ignore())
+                .ForMember(dest => dest.ProfilePictureUrl, opt => opt.MapFrom(src => src.Channel.ProfilePhotoUrl ?? src.Streamer.ProfilePictureUrl));
         }
     }
 }

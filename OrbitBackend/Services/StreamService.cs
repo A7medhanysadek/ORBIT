@@ -591,7 +591,8 @@ namespace OrbitBackend.Services
                     CategoryName = s.Category?.Name,
                     CategorySlug = s.Category?.Slug,
                     IsReconnecting = s.DisconnectedAt != null,
-                    ViewerCount = _viewerTracker.GetViewerCount(s.Id)
+                    ViewerCount = _viewerTracker.GetViewerCount(s.Id),
+                    ProfilePictureUrl = s.Channel.ProfilePhotoUrl ?? s.Streamer.ProfilePictureUrl
                 };
             }).ToList();
         }
@@ -1077,7 +1078,8 @@ namespace OrbitBackend.Services
                 CreatedAt = stream.CreatedAt,
                 CategoryId = stream.CategoryId,
                 CategoryName = stream.Category?.Name,
-                CategorySlug = stream.Category?.Slug
+                CategorySlug = stream.Category?.Slug,
+                ProfilePictureUrl = channel.ProfilePhotoUrl ?? streamer.ProfilePictureUrl
             };
         }
     }
