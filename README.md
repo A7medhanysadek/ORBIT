@@ -328,13 +328,3 @@ For detailed technical references:
 
 ---
 
-## 👨‍💻 Author & Contributions
-
-Engineered with ❤️ by **Ahmed Hany**
-- GitHub: [@A7medhanysadek](https://github.com/A7medhanysadek)
-- Project: [Orbit Streaming Platform](https://github.com/A7medhanysadek/ORBIT)
-
----
-
-## 📄 License
-This project is open-source and licensed under the [MIT License](LICENSE).
