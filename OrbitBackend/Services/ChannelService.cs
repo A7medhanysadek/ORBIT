@@ -108,21 +108,37 @@ namespace OrbitBackend.Services
 
         public async Task<ChannelModeratorDto> HireModeratorAsync(string ownerUserId, HireModeratorDto dto)
         {
-            var channel = await _context.Channels
-                .Include(c => c.Moderators)
-                .FirstOrDefaultAsync(c => c.OwnerId == ownerUserId)
-                ?? throw new InvalidOperationException("You don't have a channel.");
+            var caller = await _userManager.FindByIdAsync(ownerUserId);
+            var isAdmin = caller != null && await _userManager.IsInRoleAsync(caller, "Admin");
 
-            var targetUser = await _userManager.FindByNameAsync(dto.Username)
+            Channel? channel = null;
+            if (dto.ChannelId.HasValue && dto.ChannelId.Value > 0)
+            {
+                channel = await _context.Channels
+                    .Include(c => c.Moderators)
+                    .FirstOrDefaultAsync(c => c.Id == dto.ChannelId.Value && (c.OwnerId == ownerUserId || isAdmin));
+            }
+
+            if (channel == null)
+            {
+                channel = await _context.Channels
+                    .Include(c => c.Moderators)
+                    .FirstOrDefaultAsync(c => c.OwnerId == ownerUserId);
+            }
+
+            if (channel == null)
+                throw new InvalidOperationException("You don't have permission to manage moderators for this channel or you don't have a channel.");
+
+            var targetUser = await FindTargetUserAsync(dto.Username)
                 ?? throw new InvalidOperationException($"User '{dto.Username}' not found.");
 
-            if (targetUser.Id == ownerUserId)
-                throw new InvalidOperationException("You cannot hire yourself as a moderator.");
+            if (targetUser.Id == channel.OwnerId)
+                throw new InvalidOperationException("You cannot hire the channel owner as a moderator.");
 
             // Check if already a moderator
             var alreadyMod = channel.Moderators.Any(m => m.UserId == targetUser.Id);
             if (alreadyMod)
-                throw new InvalidOperationException($"'{dto.Username}' is already a moderator for your channel.");
+                throw new InvalidOperationException($"'{targetUser.FullName ?? targetUser.UserName}' is already a moderator for this channel.");
 
             var moderator = new ChannelModerator
             {
@@ -163,18 +179,33 @@ namespace OrbitBackend.Services
             };
         }
 
-        public async Task RemoveModeratorAsync(string ownerUserId, string username)
+        public async Task RemoveModeratorAsync(string ownerUserId, string username, int? channelId = null)
         {
-            var channel = await _context.Channels
-                .FirstOrDefaultAsync(c => c.OwnerId == ownerUserId)
-                ?? throw new InvalidOperationException("You don't have a channel.");
+            var caller = await _userManager.FindByIdAsync(ownerUserId);
+            var isAdmin = caller != null && await _userManager.IsInRoleAsync(caller, "Admin");
 
-            var targetUser = await _userManager.FindByNameAsync(username)
+            Channel? channel = null;
+            if (channelId.HasValue && channelId.Value > 0)
+            {
+                channel = await _context.Channels
+                    .FirstOrDefaultAsync(c => c.Id == channelId.Value && (c.OwnerId == ownerUserId || isAdmin));
+            }
+
+            if (channel == null)
+            {
+                channel = await _context.Channels
+                    .FirstOrDefaultAsync(c => c.OwnerId == ownerUserId);
+            }
+
+            if (channel == null)
+                throw new InvalidOperationException("You don't have permission to manage moderators for this channel or you don't have a channel.");
+
+            var targetUser = await FindTargetUserAsync(username)
                 ?? throw new InvalidOperationException($"User '{username}' not found.");
 
             var moderator = await _context.ChannelModerators
                 .FirstOrDefaultAsync(m => m.ChannelId == channel.Id && m.UserId == targetUser.Id)
-                ?? throw new InvalidOperationException($"'{username}' is not a moderator for your channel.");
+                ?? throw new InvalidOperationException($"'{targetUser.FullName ?? targetUser.UserName}' is not a moderator for this channel.");
 
             _context.ChannelModerators.Remove(moderator);
             await _context.SaveChangesAsync();
@@ -193,11 +224,26 @@ namespace OrbitBackend.Services
                 username, channel.ChannelName);
         }
 
-        public async Task<List<ChannelModeratorDto>> GetModeratorsAsync(string ownerUserId)
+        public async Task<List<ChannelModeratorDto>> GetModeratorsAsync(string ownerUserId, int? channelId = null)
         {
-            var channel = await _context.Channels
-                .FirstOrDefaultAsync(c => c.OwnerId == ownerUserId)
-                ?? throw new InvalidOperationException("You don't have a channel.");
+            var caller = await _userManager.FindByIdAsync(ownerUserId);
+            var isAdmin = caller != null && await _userManager.IsInRoleAsync(caller, "Admin");
+
+            Channel? channel = null;
+            if (channelId.HasValue && channelId.Value > 0)
+            {
+                channel = await _context.Channels
+                    .FirstOrDefaultAsync(c => c.Id == channelId.Value && (c.OwnerId == ownerUserId || isAdmin));
+            }
+
+            if (channel == null)
+            {
+                channel = await _context.Channels
+                    .FirstOrDefaultAsync(c => c.OwnerId == ownerUserId);
+            }
+
+            if (channel == null)
+                throw new InvalidOperationException("You don't have a channel.");
 
             return await _context.ChannelModerators
                 .Where(m => m.ChannelId == channel.Id)
@@ -474,6 +520,41 @@ namespace OrbitBackend.Services
                     CreatedAt = e.CreatedAt
                 })
                 .ToListAsync();
+        }
+
+        private async Task<AppUser?> FindTargetUserAsync(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+                return null;
+
+            var trimmed = identifier.Trim();
+
+            // 1. Exact handle via Identity UserManager
+            var user = await _userManager.FindByNameAsync(trimmed);
+            if (user != null) return user;
+
+            // 2. User Id lookup
+            user = await _userManager.FindByIdAsync(trimmed);
+            if (user != null) return user;
+
+            // 3. Email lookup
+            user = await _userManager.FindByEmailAsync(trimmed);
+            if (user != null) return user;
+
+            // 4. Case-insensitive search on UserName or FullName
+            var lower = trimmed.ToLower();
+            user = await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    (u.UserName != null && u.UserName.ToLower() == lower) ||
+                    (u.FullName != null && u.FullName.ToLower() == lower));
+            if (user != null) return user;
+
+            // 5. Normalized match fallback
+            var upper = trimmed.ToUpper();
+            return await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    u.NormalizedUserName == upper ||
+                    u.NormalizedEmail == upper);
         }
 
         private static ChannelResponseDto MapToResponseDto(Channel channel, AppUser owner)

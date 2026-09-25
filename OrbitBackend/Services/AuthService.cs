@@ -299,6 +299,15 @@ namespace OrbitBackend.Services
             user.RefreshTokenExpiryTime = refreshTokenExpiry;
             await _userManager.UpdateAsync(user);
 
+            try
+            {
+                await _context.Entry(user).Reference(u => u.Channel).LoadAsync();
+            }
+            catch
+            {
+                // Ignore if already loaded or not tracking
+            }
+
             var response = _mapper.Map<AuthResponseDto>(user);
             response.AccessToken = accessToken;
             response.AccessTokenExpiry = accessTokenExpiry;

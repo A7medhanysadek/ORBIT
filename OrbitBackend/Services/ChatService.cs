@@ -59,18 +59,22 @@ namespace OrbitBackend.Services
                 "Chat message {MessageId} saved for stream {StreamId} at offset {Offset}s.",
                 message.Id, streamId, message.StreamOffsetSeconds);
 
-            return MapToDto(message);
+            return MapToDto(message, user);
         }
 
         public async Task<List<ChatMessageDto>> GetStreamChatAsync(int streamId)
         {
             return await _context.ChatMessages
+                .Include(m => m.Sender)
                 .Where(m => m.LiveStreamId == streamId && !m.IsDeleted)
                 .OrderBy(m => m.StreamOffsetSeconds)
                 .Select(m => new ChatMessageDto
                 {
                     Id = m.Id,
                     SenderName = m.SenderName,
+                    SenderUsername = m.Sender != null ? m.Sender.UserName : null,
+                    SenderId = m.SenderId,
+                    SenderAvatarUrl = m.Sender != null ? m.Sender.ProfilePictureUrl : null,
                     SenderBadge = m.SenderBadge,
                     Content = m.Content,
                     SentAt = m.SentAt,
@@ -82,6 +86,7 @@ namespace OrbitBackend.Services
         public async Task<List<ChatMessageDto>> GetStreamChatRangeAsync(int streamId, double fromSeconds, double toSeconds)
         {
             return await _context.ChatMessages
+                .Include(m => m.Sender)
                 .Where(m => m.LiveStreamId == streamId
                          && !m.IsDeleted
                          && m.StreamOffsetSeconds >= fromSeconds
@@ -91,6 +96,9 @@ namespace OrbitBackend.Services
                 {
                     Id = m.Id,
                     SenderName = m.SenderName,
+                    SenderUsername = m.Sender != null ? m.Sender.UserName : null,
+                    SenderId = m.SenderId,
+                    SenderAvatarUrl = m.Sender != null ? m.Sender.ProfilePictureUrl : null,
                     SenderBadge = m.SenderBadge,
                     Content = m.Content,
                     SentAt = m.SentAt,
@@ -99,12 +107,15 @@ namespace OrbitBackend.Services
                 .ToListAsync();
         }
 
-        private static ChatMessageDto MapToDto(ChatMessage message)
+        private static ChatMessageDto MapToDto(ChatMessage message, AppUser? sender = null)
         {
             return new ChatMessageDto
             {
                 Id = message.Id,
                 SenderName = message.SenderName,
+                SenderUsername = sender?.UserName ?? message.Sender?.UserName,
+                SenderId = message.SenderId,
+                SenderAvatarUrl = sender?.ProfilePictureUrl ?? message.Sender?.ProfilePictureUrl,
                 SenderBadge = message.SenderBadge,
                 Content = message.Content,
                 SentAt = message.SentAt,

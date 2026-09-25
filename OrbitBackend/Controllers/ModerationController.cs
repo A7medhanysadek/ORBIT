@@ -13,7 +13,7 @@ namespace OrbitBackend.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    [Authorize(Roles = "Streamer,Moderator,Admin")]
+    [Authorize]
     public class ModerationController : ControllerBase
     {
         private readonly IModerationService _moderationService;
@@ -88,6 +88,34 @@ namespace OrbitBackend.Controllers
         {
             var userId = GetUserId();
             var result = await _moderationService.UnbanUserAsync(channelId, userId, username);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Removes an active timeout for a user from chat in a specific channel.
+        /// </summary>
+        [HttpDelete("{channelId:int}/timeout/{username}")]
+        [ProducesResponseType(typeof(ModerationActionDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> RemoveTimeout(int channelId, string username)
+        {
+            var userId = GetUserId();
+            var result = await _moderationService.RemoveTimeoutAsync(channelId, userId, username);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Gets the current moderation status (isModerator, isTimedOut, isBanned) for a target user in a channel.
+        /// </summary>
+        [HttpGet("{channelId:int}/user-status")]
+        [ProducesResponseType(typeof(UserModerationStatusDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetUserModerationStatus(int channelId, [FromQuery] string username)
+        {
+            var result = await _moderationService.GetUserModerationStatusAsync(channelId, username);
             return Ok(result);
         }
 

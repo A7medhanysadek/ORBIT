@@ -97,7 +97,7 @@ namespace OrbitBackend.Controllers
         /// Only the channel owner can hire moderators.
         /// </summary>
         [HttpPost("moderators/hire")]
-        [Authorize(Roles = "Streamer,Admin")]
+        [Authorize]
         [ProducesResponseType(typeof(ChannelModeratorDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -117,31 +117,31 @@ namespace OrbitBackend.Controllers
         /// Only the channel owner can remove moderators.
         /// </summary>
         [HttpDelete("moderators/{username}")]
-        [Authorize(Roles = "Streamer,Admin")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> RemoveModerator(string username)
+        public async Task<IActionResult> RemoveModerator(string username, [FromQuery] int? channelId = null)
         {
             var userId = GetUserId();
-            await _channelService.RemoveModeratorAsync(userId, username);
+            await _channelService.RemoveModeratorAsync(userId, username, channelId);
             return NoContent();
         }
 
         /// <summary>
-        /// Lists all moderators for the authenticated user's channel.
+        /// Lists all moderators for the authenticated user's channel (or specified channel).
         /// </summary>
         [HttpGet("moderators")]
-        [Authorize(Roles = "Streamer")]
+        [Authorize]
         [ProducesResponseType(typeof(List<ChannelModeratorDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> GetModerators()
+        public async Task<IActionResult> GetModerators([FromQuery] int? channelId = null)
         {
             var userId = GetUserId();
-            var result = await _channelService.GetModeratorsAsync(userId);
+            var result = await _channelService.GetModeratorsAsync(userId, channelId);
             return Ok(result);
         }
 

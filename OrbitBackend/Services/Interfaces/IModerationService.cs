@@ -25,6 +25,16 @@ namespace OrbitBackend.Services.Interfaces
         Task<ModerationActionDto> UnbanUserAsync(int channelId, string moderatorId, string username);
 
         /// <summary>
+        /// Removes an active timeout for a user in a channel's chat.
+        /// </summary>
+        Task<ModerationActionDto> RemoveTimeoutAsync(int channelId, string moderatorId, string username);
+
+        /// <summary>
+        /// Gets the current moderation status (isModerator, isTimedOut, isBanned) for a target user in a channel.
+        /// </summary>
+        Task<UserModerationStatusDto> GetUserModerationStatusAsync(int channelId, string username);
+
+        /// <summary>
         /// Checks whether a user is currently timed out in a channel.
         /// </summary>
         Task<bool> IsUserTimedOutAsync(int channelId, string userId);

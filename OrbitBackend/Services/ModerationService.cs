@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using OrbitBackend.Data;
 using OrbitBackend.DTOs.Moderation;
+using OrbitBackend.Hubs;
 using OrbitBackend.Models;
 using OrbitBackend.Services.Interfaces;
 
@@ -12,17 +14,20 @@ namespace OrbitBackend.Services
         private readonly AppDbContext _context;
         private readonly UserManager<AppUser> _userManager;
         private readonly IConfiguration _config;
+        private readonly IHubContext<StreamChatHub> _hubContext;
         private readonly ILogger<ModerationService> _logger;
 
         public ModerationService(
             AppDbContext context,
             UserManager<AppUser> userManager,
             IConfiguration config,
+            IHubContext<StreamChatHub> hubContext,
             ILogger<ModerationService> logger)
         {
             _context = context;
             _userManager = userManager;
             _config = config;
+            _hubContext = hubContext;
             _logger = logger;
         }
 
@@ -41,6 +46,15 @@ namespace OrbitBackend.Services
             message.IsDeleted = true;
             message.DeletedByUserId = moderatorId;
             await _context.SaveChangesAsync();
+
+            try
+            {
+                await _hubContext.Clients.Group($"stream_{message.LiveStreamId}").SendAsync("MessageDeleted", messageId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast MessageDeleted via SignalR for stream {StreamId}", message.LiveStreamId);
+            }
 
             var moderator = await _userManager.FindByIdAsync(moderatorId);
 
@@ -70,7 +84,7 @@ namespace OrbitBackend.Services
                 throw new InvalidOperationException(
                     $"Timeout duration must be between {minTimeout} and {maxTimeout} seconds.");
 
-            var targetUser = await _userManager.FindByNameAsync(dto.Username)
+            var targetUser = await FindTargetUserAsync(dto.Username)
                 ?? throw new InvalidOperationException($"User '{dto.Username}' not found.");
 
             // Prevent timing out the channel owner
@@ -100,6 +114,23 @@ namespace OrbitBackend.Services
             _context.ChatTimeouts.Add(timeout);
             await _context.SaveChangesAsync();
 
+            try
+            {
+                var liveStreamIds = await _context.LiveStreams
+                    .Where(s => s.ChannelId == channelId && s.IsLive)
+                    .Select(s => s.Id)
+                    .ToListAsync();
+
+                foreach (var sid in liveStreamIds)
+                {
+                    await _hubContext.Clients.Group($"stream_{sid}").SendAsync("UserTimedOut", targetUser.UserName ?? dto.Username, dto.DurationSeconds);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast UserTimedOut via SignalR for channel {ChannelId}", channelId);
+            }
+
             var moderator = await _userManager.FindByIdAsync(moderatorId);
 
             _logger.LogInformation(
@@ -122,7 +153,7 @@ namespace OrbitBackend.Services
         {
             await EnsureModerationPrivileges(channelId, moderatorId);
 
-            var targetUser = await _userManager.FindByNameAsync(dto.Username)
+            var targetUser = await FindTargetUserAsync(dto.Username)
                 ?? throw new InvalidOperationException($"User '{dto.Username}' not found.");
 
             var channel = await _context.Channels.FindAsync(channelId)
@@ -158,6 +189,23 @@ namespace OrbitBackend.Services
             _context.ChatBans.Add(ban);
             await _context.SaveChangesAsync();
 
+            try
+            {
+                var liveStreamIds = await _context.LiveStreams
+                    .Where(s => s.ChannelId == channelId && s.IsLive)
+                    .Select(s => s.Id)
+                    .ToListAsync();
+
+                foreach (var sid in liveStreamIds)
+                {
+                    await _hubContext.Clients.Group($"stream_{sid}").SendAsync("UserBanned", targetUser.UserName ?? dto.Username);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast UserBanned via SignalR for channel {ChannelId}", channelId);
+            }
+
             var moderator = await _userManager.FindByIdAsync(moderatorId);
 
             _logger.LogInformation(
@@ -179,7 +227,7 @@ namespace OrbitBackend.Services
         {
             await EnsureModerationPrivileges(channelId, moderatorId);
 
-            var targetUser = await _userManager.FindByNameAsync(username)
+            var targetUser = await FindTargetUserAsync(username)
                 ?? throw new InvalidOperationException($"User '{username}' not found.");
 
             var ban = await _context.ChatBans
@@ -188,6 +236,23 @@ namespace OrbitBackend.Services
 
             ban.IsActive = false;
             await _context.SaveChangesAsync();
+
+            try
+            {
+                var liveStreamIds = await _context.LiveStreams
+                    .Where(s => s.ChannelId == channelId && s.IsLive)
+                    .Select(s => s.Id)
+                    .ToListAsync();
+
+                foreach (var sid in liveStreamIds)
+                {
+                    await _hubContext.Clients.Group($"stream_{sid}").SendAsync("UserUnbanned", targetUser.UserName ?? username);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast UserUnbanned via SignalR for channel {ChannelId}", channelId);
+            }
 
             var moderator = await _userManager.FindByIdAsync(moderatorId);
 
@@ -202,6 +267,98 @@ namespace OrbitBackend.Services
                 ModeratorName = moderator?.FullName ?? "Unknown",
                 Timestamp = DateTime.UtcNow,
                 Message = $"User '{username}' has been unbanned from this channel."
+            };
+        }
+
+        public async Task<ModerationActionDto> RemoveTimeoutAsync(int channelId, string moderatorId, string username)
+        {
+            await EnsureModerationPrivileges(channelId, moderatorId);
+
+            var targetUser = await FindTargetUserAsync(username)
+                ?? throw new InvalidOperationException($"User '{username}' not found.");
+
+            var activeTimeouts = await _context.ChatTimeouts
+                .Where(t => t.ChannelId == channelId && t.UserId == targetUser.Id && t.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+
+            if (!activeTimeouts.Any())
+                throw new InvalidOperationException($"User '{username}' is not timed out in this channel.");
+
+            foreach (var t in activeTimeouts)
+            {
+                t.ExpiresAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync();
+
+            try
+            {
+                var liveStreamIds = await _context.LiveStreams
+                    .Where(s => s.ChannelId == channelId && s.IsLive)
+                    .Select(s => s.Id)
+                    .ToListAsync();
+
+                foreach (var sid in liveStreamIds)
+                {
+                    await _hubContext.Clients.Group($"stream_{sid}").SendAsync("UserTimeoutRemoved", targetUser.UserName ?? username);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast UserTimeoutRemoved via SignalR for channel {ChannelId}", channelId);
+            }
+
+            var moderator = await _userManager.FindByIdAsync(moderatorId);
+
+            _logger.LogInformation(
+                "Timeout for user '{Username}' removed in channel {ChannelId} by {ModeratorId}.",
+                username, channelId, moderatorId);
+
+            return new ModerationActionDto
+            {
+                Action = "RemoveTimeout",
+                TargetUsername = username,
+                ModeratorName = moderator?.FullName ?? "Unknown",
+                Timestamp = DateTime.UtcNow,
+                Message = $"Timeout for user '{username}' has been removed."
+            };
+        }
+
+        public async Task<UserModerationStatusDto> GetUserModerationStatusAsync(int channelId, string username)
+        {
+            var targetUser = await FindTargetUserAsync(username);
+            if (targetUser == null)
+            {
+                return new UserModerationStatusDto
+                {
+                    Username = username,
+                    IsModerator = false,
+                    IsTimedOut = false,
+                    IsBanned = false
+                };
+            }
+
+            var isMod = await _context.ChannelModerators
+                .AnyAsync(m => m.ChannelId == channelId && m.UserId == targetUser.Id);
+
+            var isBanned = await _context.ChatBans
+                .AnyAsync(b => b.ChannelId == channelId && b.UserId == targetUser.Id && b.IsActive);
+
+            var activeTimeout = await _context.ChatTimeouts
+                .Where(t => t.ChannelId == channelId && t.UserId == targetUser.Id && t.ExpiresAt > DateTime.UtcNow)
+                .OrderByDescending(t => t.ExpiresAt)
+                .FirstOrDefaultAsync();
+
+            return new UserModerationStatusDto
+            {
+                Username = targetUser.UserName ?? username,
+                UserId = targetUser.Id,
+                DisplayName = targetUser.FullName,
+                IsModerator = isMod,
+                IsBanned = isBanned,
+                IsTimedOut = activeTimeout != null,
+                TimeoutRemainingSeconds = activeTimeout != null
+                    ? (int)Math.Max(0, (activeTimeout.ExpiresAt - DateTime.UtcNow).TotalSeconds)
+                    : 0
             };
         }
 
@@ -242,6 +399,41 @@ namespace OrbitBackend.Services
             var hasPrivileges = await HasModerationPrivilegesAsync(channelId, userId);
             if (!hasPrivileges)
                 throw new InvalidOperationException("You do not have moderation privileges for this channel.");
+        }
+
+        private async Task<AppUser?> FindTargetUserAsync(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+                return null;
+
+            var trimmed = identifier.Trim();
+
+            // 1. Exact handle via Identity UserManager
+            var user = await _userManager.FindByNameAsync(trimmed);
+            if (user != null) return user;
+
+            // 2. User Id lookup
+            user = await _userManager.FindByIdAsync(trimmed);
+            if (user != null) return user;
+
+            // 3. Email lookup
+            user = await _userManager.FindByEmailAsync(trimmed);
+            if (user != null) return user;
+
+            // 4. Case-insensitive search on UserName or FullName
+            var lower = trimmed.ToLower();
+            user = await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    (u.UserName != null && u.UserName.ToLower() == lower) ||
+                    (u.FullName != null && u.FullName.ToLower() == lower));
+            if (user != null) return user;
+
+            // 5. Normalized match fallback
+            var upper = trimmed.ToUpper();
+            return await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    u.NormalizedUserName == upper ||
+                    u.NormalizedEmail == upper);
         }
     }
 }

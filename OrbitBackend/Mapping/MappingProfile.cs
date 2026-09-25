@@ -27,6 +27,8 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
                 .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
                 .ForMember(dest => dest.ProfilePictureUrl, opt => opt.MapFrom(src => src.ProfilePictureUrl))
+                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel != null ? src.Channel.ChannelName : null))
+                .ForMember(dest => dest.ChannelId, opt => opt.MapFrom(src => src.Channel != null ? (int?)src.Channel.Id : null))
                 .ForMember(dest => dest.AccessToken, opt => opt.Ignore())
                 .ForMember(dest => dest.AccessTokenExpiry, opt => opt.Ignore())
                 .ForMember(dest => dest.RefreshToken, opt => opt.Ignore())
@@ -51,8 +53,8 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.Roles, opt => opt.Ignore());
 
             CreateMap<LiveStream, StreamResponseDto>()
-                .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
-                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel.ChannelName))
+                .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Channel != null && !string.IsNullOrEmpty(src.Channel.ChannelName) ? src.Channel.ChannelName : src.Streamer.FullName))
+                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel != null ? src.Channel.ChannelName : null))
                 .ForMember(dest => dest.ChannelId, opt => opt.MapFrom(src => src.ChannelId))
                 .ForMember(dest => dest.CategoryId, opt => opt.MapFrom(src => src.CategoryId))
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null))
@@ -63,8 +65,8 @@ namespace OrbitBackend.Mapping
                 .ForMember(dest => dest.ProfilePictureUrl, opt => opt.MapFrom(src => src.Channel.ProfilePhotoUrl ?? src.Streamer.ProfilePictureUrl));
 
             CreateMap<LiveStream, LiveStreamSummaryDto>()
-                .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Streamer.FullName))
-                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel.ChannelName))
+                .ForMember(dest => dest.StreamerName, opt => opt.MapFrom(src => src.Channel != null && !string.IsNullOrEmpty(src.Channel.ChannelName) ? src.Channel.ChannelName : src.Streamer.FullName))
+                .ForMember(dest => dest.ChannelName, opt => opt.MapFrom(src => src.Channel != null ? src.Channel.ChannelName : null))
                 .ForMember(dest => dest.ChannelId, opt => opt.MapFrom(src => src.ChannelId))
                 .ForMember(dest => dest.CategoryId, opt => opt.MapFrom(src => src.CategoryId))
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null))

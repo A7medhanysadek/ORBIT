@@ -29,12 +29,12 @@ namespace OrbitBackend.Services.Interfaces
         /// <summary>
         /// Removes a moderator from the channel by their username.
         /// </summary>
-        Task RemoveModeratorAsync(string ownerUserId, string username);
+        Task RemoveModeratorAsync(string ownerUserId, string username, int? channelId = null);
 
         /// <summary>
         /// Lists all moderators for the channel owned by the given user.
         /// </summary>
-        Task<List<ChannelModeratorDto>> GetModeratorsAsync(string ownerUserId);
+        Task<List<ChannelModeratorDto>> GetModeratorsAsync(string ownerUserId, int? channelId = null);
 
         // ── Channel Customization ──
 
