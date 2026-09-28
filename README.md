@@ -32,7 +32,7 @@
 </p>
 
 <p align="center">
-  <em>⚡ <b>Autoplays continuously on repo entry.</b> Click on the preview above or use the badge to launch the complete 3-minute 1080p platform walkthrough with audio (<code>docs/Orbit Video.mp4</code>).</em>
+  <em>⚡ <b>Autoplays continuously on repo entry.</b> Click on the preview above or use the badge to launch the complete 3-minute platform walkthrough with audio (<code>docs/Orbit Video.mp4</code>).</em>
 </p>
 
 ---
