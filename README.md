@@ -13,8 +13,33 @@
 
 ---
 
+## 🎬 Platform Demo & Video Walkthrough
+
+<p align="center">
+  <a href="docs/Orbit%20Video.mp4" title="Click to watch the full 1080p demo walkthrough">
+    <img src="docs/orbit-demo.gif" alt="ORBIT Live Streaming Showcase & Demo" width="100%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.4);" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="docs/Orbit%20Video.mp4">
+    <img src="https://img.shields.io/badge/▶_Watch_Full_Walkthrough-1080p_Demo_with_Sound-512BD4?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Full Demo Video" />
+  </a>
+  &nbsp;
+  <a href="docs/Orbit%20Video.mp4">
+    <img src="https://img.shields.io/badge/docs%2FOrbit_Video.mp4-50.6_MB-009639?style=for-the-badge&logo=quicktime&logoColor=white" alt="Orbit Video File" />
+  </a>
+</p>
+
+<p align="center">
+  <em>⚡ <b>Autoplays continuously on repo entry.</b> Click on the preview above or use the badge to launch the complete 3-minute 1080p platform walkthrough with audio (<code>docs/Orbit Video.mp4</code>).</em>
+</p>
+
+---
+
 ## 📑 Table of Contents
 
+- [Platform Demo & Video Walkthrough](#-platform-demo--video-walkthrough)
 - [Architectural Overview](#-architectural-overview)
 - [Key Features](#-key-features)
 - [Tech Stack](#-tech-stack)
@@ -313,7 +338,9 @@ OrbitBackend/
 │   ├── Program.cs                  # Web application entry point & pipeline configuration
 │   └── appsettings.json            # Configuration settings & connection strings
 │
-└── docs/                           # Extended Project Documentation
+└── docs/                           # Extended Project Documentation & Media
+    ├── Orbit Video.mp4             # Full 1080p Platform Demo Walkthrough (50.6 MB)
+    ├── orbit-demo.gif              # Autoplaying Animated Showcase Preview
     ├── API_DOCUMENTATION.md        # Comprehensive API Endpoints Specification
     └── ARCHITECTURE.md             # Deep-dive Architecture & Lifecycle Specs
 ```
