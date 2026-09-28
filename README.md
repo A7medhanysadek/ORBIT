@@ -27,7 +27,7 @@
   </a>
   &nbsp;
   <a href="docs/Orbit%20Video.mp4">
-    <img src="https://img.shields.io/badge/docs%2FOrbit_Video.mp4-50.6_MB-009639?style=for-the-badge&logo=quicktime&logoColor=white" alt="Orbit Video File" />
+    <img src="https://img.shields.io/badge/docs%2FOrbit_Video.mp4-41.2_MB-009639?style=for-the-badge&logo=quicktime&logoColor=white" alt="Orbit Video File" />
   </a>
 </p>
 
@@ -339,7 +339,7 @@ OrbitBackend/
 │   └── appsettings.json            # Configuration settings & connection strings
 │
 └── docs/                           # Extended Project Documentation & Media
-    ├── Orbit Video.mp4             # Full 1080p Platform Demo Walkthrough (50.6 MB)
+    ├── Orbit Video.mp4             # Full 1080p Platform Demo Walkthrough (41.2 MB)
     ├── orbit-demo.gif              # Autoplaying Animated Showcase Preview
     ├── API_DOCUMENTATION.md        # Comprehensive API Endpoints Specification
     └── ARCHITECTURE.md             # Deep-dive Architecture & Lifecycle Specs
