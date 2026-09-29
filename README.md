@@ -1,8 +1,5 @@
 # 🪐 ORBIT — Backend API & Streaming Infrastructure
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-OrbitFrontend-00D26A?style=for-the-badge&logo=googlechrome&logoColor=white)](https://a7medhanysadek.github.io/OrbitFrontend/#home)
-[![Frontend Repo](https://img.shields.io/badge/Frontend_Repo-OrbitFrontend-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/A7medhanysadek/OrbitFrontend)
-[![LinkedIn Showcase](https://img.shields.io/badge/LinkedIn-Video_Walkthrough-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/feed/update/urn:li:activity:7509283410247458816/)
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-12.0-239120?logo=c-sharp&logoColor=white)](https://docs.microsoft.com/en-us/dotnet/csharp/)
