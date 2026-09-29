@@ -1,5 +1,9 @@
 # 🪐 ORBIT — Backend API & Streaming Infrastructure
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-OrbitFrontend-00D26A?style=for-the-badge&logo=googlechrome&logoColor=white)](https://a7medhanysadek.github.io/OrbitFrontend/#home)
+[![Frontend Repo](https://img.shields.io/badge/Frontend_Repo-OrbitFrontend-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/A7medhanysadek/OrbitFrontend)
+[![LinkedIn Showcase](https://img.shields.io/badge/LinkedIn-Video_Walkthrough-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/feed/update/urn:li:activity:7509283410247458816/)
+
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-12.0-239120?logo=c-sharp&logoColor=white)](https://docs.microsoft.com/en-us/dotnet/csharp/)
 [![ASP.NET Core Web API](https://img.shields.io/badge/ASP.NET_Core-Web_API-512BD4)](https://docs.microsoft.com/aspnet/core)
@@ -9,37 +13,56 @@
 [![NGINX-RTMP](https://img.shields.io/badge/Media_Server-NGINX--RTMP-009639?logo=nginx&logoColor=white)](https://github.com/arut/nginx-rtmp-module)
 [![Cloudinary](https://img.shields.io/badge/CDN-Cloudinary-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
 
-> **ORBIT** is a next-generation, high-performance live streaming platform built on **ASP.NET Core 8**, **SignalR**, and an **NGINX-RTMP** media pipeline. It powers real-time video ingestion, low-latency HLS broadcast distribution, interactive sub-second live chat, highlight clipping, automated VOD archiving, and robust channel moderation.
+> **ORBIT** is a next-generation, high-performance live streaming platform built on **ASP.NET Core 8**, **SignalR**, and an **NGINX-RTMP** media pipeline. It powers real-time video ingestion, low-latency HLS broadcast distribution, interactive sub-second live chat, highlight clipping, automated VOD archiving, and robust channel moderation. Experience the live client deployed at **[Orbit Web App](https://a7medhanysadek.github.io/OrbitFrontend/#home)** (source: **[OrbitFrontend](https://github.com/A7medhanysadek/OrbitFrontend)**).
 
 ---
 
 ## 🎬 Platform Demo & Video Walkthrough
 
 <p align="center">
-  <a href="docs/Orbit%20Video.mp4" title="Click to watch the full 1080p demo walkthrough">
+  <a href="https://www.linkedin.com/feed/update/urn:li:activity:7509283410247458816/" target="_blank" title="Click to watch the full demo walkthrough & post on LinkedIn">
     <img src="docs/orbit-demo.gif" alt="ORBIT Live Streaming Showcase & Demo" width="100%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.4);" />
   </a>
 </p>
 
 <p align="center">
-  <a href="docs/Orbit%20Video.mp4">
-    <img src="https://img.shields.io/badge/▶_Watch_Full_Walkthrough-1080p_Demo_with_Sound-512BD4?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Full Demo Video" />
+  <a href="https://www.linkedin.com/feed/update/urn:li:activity:7509283410247458816/" target="_blank">
+    <img src="https://img.shields.io/badge/▶_Watch_Full_Walkthrough-LinkedIn_Post-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="Watch Walkthrough on LinkedIn" />
+  </a>
+  &nbsp;
+  <a href="https://a7medhanysadek.github.io/OrbitFrontend/#home" target="_blank">
+    <img src="https://img.shields.io/badge/🚀_Try_Live_Demo-OrbitFrontend-00D26A?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Try Live Demo on GitHub Pages" />
   </a>
   &nbsp;
   <a href="docs/Orbit%20Video.mp4">
-    <img src="https://img.shields.io/badge/docs%2FOrbit_Video.mp4-41.2_MB-009639?style=for-the-badge&logo=quicktime&logoColor=white" alt="Orbit Video File" />
+    <img src="https://img.shields.io/badge/docs%2FOrbit_Video.mp4-41.2_MB-512BD4?style=for-the-badge&logo=quicktime&logoColor=white" alt="Orbit Video File" />
   </a>
 </p>
 
 <p align="center">
-  <em>⚡ <b>Autoplays continuously on repo entry.</b> Click on the preview above or use the badge to launch the complete 3-minute platform walkthrough with audio (<code>docs/Orbit Video.mp4</code>).</em>
+  <em>⚡ <b>Autoplays continuously on repo entry.</b> Click the preview above or the badges to watch the full walkthrough on <a href="https://www.linkedin.com/feed/update/urn:li:activity:7509283410247458816/">LinkedIn</a>, try the live demo at <a href="https://a7medhanysadek.github.io/OrbitFrontend/#home">OrbitFrontend</a>, or download the 1080p video file (<code>docs/Orbit Video.mp4</code>).</em>
 </p>
+
+---
+
+## 🌐 Live Demo & Frontend Project
+
+ORBIT features a fully integrated companion web client built with modern JavaScript, Vite, HLS.js, and SignalR:
+
+| Resource | Link | Description |
+|---|---|---|
+| 🚀 **Live Deployed App** | **[a7medhanysadek.github.io/OrbitFrontend](https://a7medhanysadek.github.io/OrbitFrontend/#home)** | Live client deployed on GitHub Pages |
+| 💻 **Frontend Repository** | **[A7medhanysadek/OrbitFrontend](https://github.com/A7medhanysadek/OrbitFrontend)** | Client source code with Video.js / HLS.js streaming & SignalR chat |
+| 🎬 **LinkedIn Showcase** | **[Post & Video Walkthrough](https://www.linkedin.com/feed/update/urn:li:activity:7509283410247458816/)** | Architecture write-up, showcase video, and project insights |
+
+> ℹ️ *Note: The live demo is in public preview mode (live streaming ingestion and video clip creation require active RTMP/OBS infrastructure).*
 
 ---
 
 ## 📑 Table of Contents
 
 - [Platform Demo & Video Walkthrough](#-platform-demo--video-walkthrough)
+- [Live Demo & Frontend Project](#-live-demo--frontend-project)
 - [Architectural Overview](#-architectural-overview)
 - [Key Features](#-key-features)
 - [Tech Stack](#-tech-stack)
@@ -68,12 +91,12 @@
            RTMP Callbacks       │            │ Transmuxed HLS (.m3u8 / .ts)
   (on_publish / on_record_done) │            │
                                 ▼            ▼
-┌─────────────────────────────────┐   ┌────────────────────────┐
-│     OrbitBackend (.NET 8)       │   │    Frontend Web App    │
-│  ├── REST API Controllers       │   │  (Video.js / HLS.js)   │
-│  ├── SignalR StreamChatHub      │   └───────────┬────────────┘
-│  ├── GracePeriod Background Svc │               │
-│  └── EF Core 8 (SQL Server)     │ ◄─────────────┘
+┌─────────────────────────────────┐   ┌──────────────────────────────┐
+│     OrbitBackend (.NET 8)       │   │    Frontend Web App (Vite)   │
+│  ├── REST API Controllers       │   │  (Video.js / HLS.js)         │
+│  ├── SignalR StreamChatHub      │   │  [Live on GitHub Pages]      │
+│  ├── GracePeriod Background Svc │   └──────────────┬───────────────┘
+│  └── EF Core 8 (SQL Server)     │ ◄────────────────┘
 └────────────────┬────────────────┘  SignalR WebSockets (port 5000)
                  │
                  ├── Cloudinary (Avatars, Banners, Custom Emotes, Clips)
@@ -352,6 +375,9 @@ OrbitBackend/
 For detailed technical references:
 - **[Full REST API Specification](docs/API_DOCUMENTATION.md)**: Detailed JSON payloads, query parameters, authorization requirements, and response models.
 - **[System Architecture & Design Decisions](docs/ARCHITECTURE.md)**: State machines, background workers, grace period design, and concurrent data structures.
+- **[Live Deployed Frontend Web App](https://a7medhanysadek.github.io/OrbitFrontend/#home)**: Explore the interactive live client deployed on GitHub Pages.
+- **[Frontend Client Repository](https://github.com/A7medhanysadek/OrbitFrontend)**: View client-side UI, Video.js/HLS.js streaming player, and SignalR chat implementation.
 
 ---
+
 
