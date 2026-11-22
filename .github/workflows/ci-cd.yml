@@ -1,4 +1,4 @@
-name: Orbit CI/CD Pipeline
+name: "Orbit CI/CD Pipeline"
 
 on:
   push:
@@ -9,43 +9,43 @@ on:
 
 jobs:
   build-and-test:
-    name: 🧪 Build & Unit Tests
+    name: "🧪 Build & Unit Tests"
     runs-on: windows-latest
 
     steps:
-    - name: Checkout Code
+    - name: "Checkout Code"
       uses: actions/checkout@v4
 
-    - name: Setup .NET 8 SDK
+    - name: "Setup .NET 8 SDK"
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
-    - name: Restore Dependencies
+    - name: "Restore Dependencies"
       run: dotnet restore OrbitBackend.sln
 
-    - name: Build Solution
+    - name: "Build Solution"
       run: dotnet build OrbitBackend.sln --no-restore --configuration Release
 
-    - name: Run Unit Tests
+    - name: "Run Unit Tests"
       run: dotnet test OrbitBackend.sln --no-build --configuration Release --verbosity normal
 
   deploy-to-monsterasp:
-    name: 🚀 Deploy API to MonsterASP.NET
+    name: "🚀 Deploy API to MonsterASP.NET"
     needs: build-and-test
     runs-on: windows-latest
     if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name != 'pull_request'
 
     steps:
-    - name: Checkout Code
+    - name: "Checkout Code"
       uses: actions/checkout@v4
 
-    - name: Setup .NET 8 SDK
+    - name: "Setup .NET 8 SDK"
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
-    - name: Resolve Deployment Credentials
+    - name: "Resolve Deployment Credentials"
       id: creds
       shell: pwsh
       env:
@@ -70,13 +70,13 @@ jobs:
         Write-Host "::add-mask::$pass"
         Write-Host "::add-mask::$ftpPass"
 
-    - name: Restore API Dependencies
+    - name: "Restore API Dependencies"
       run: dotnet restore OrbitBackend/OrbitBackend.csproj --runtime win-x86
 
-    - name: Publish API Project (win-x86)
+    - name: "Publish API Project (win-x86)"
       run: dotnet publish OrbitBackend/OrbitBackend.csproj --configuration Release --runtime win-x86 --no-self-contained --output ./publish
 
-    - name: 🚀 Deploy to MonsterASP.NET via MSDeploy
+    - name: "🚀 Deploy to MonsterASP.NET via MSDeploy"
       id: msdeploy
       continue-on-error: true
       shell: pwsh
@@ -107,7 +107,7 @@ jobs:
           -allowUntrusted `
           -verbose
 
-    - name: 📂 Fallback: Deploy via FTP if MSDeploy fails
+    - name: "📂 Fallback Deploy via FTP if MSDeploy fails"
       if: steps.msdeploy.outcome != 'success'
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
