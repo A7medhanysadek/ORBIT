@@ -46,17 +46,48 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore API Dependencies
-      run: dotnet restore OrbitBackend\OrbitBackend.csproj
+      run: dotnet restore OrbitBackend/OrbitBackend.csproj
 
     - name: Publish API Project
-      run: dotnet publish OrbitBackend\OrbitBackend.csproj --configuration Release --output ./publish
+      run: dotnet publish OrbitBackend/OrbitBackend.csproj --configuration Release --output ./publish
 
-    - name: Deploy to MonsterASP.NET via WebDeploy
-      uses: rasmusbuchholdt/simply-web-deploy@2.2.0
+    - name: 🚀 Deploy to MonsterASP.NET via MSDeploy
+      id: msdeploy
+      continue-on-error: true
+      shell: pwsh
+      run: |
+        $msdeploy = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        if (-not (Test-Path $msdeploy)) {
+            $msdeploy = "C:\Program Files (x86)\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        }
+        if (-not (Test-Path $msdeploy)) {
+            throw "msdeploy.exe was not found on the runner."
+        }
+        
+        $site = "${{ secrets.MONSTERASP_WEBSITE_NAME || 'site80600' }}"
+        $server = "${{ secrets.MONSTERASP_SERVER || 'site80600.siteasp.net' }}"
+        $username = "${{ secrets.MONSTERASP_USERNAME || 'site80600' }}"
+        $password = "${{ secrets.MONSTERASP_PASSWORD || 'Gs2@9_nMzH#5' }}"
+        $sourceDir = (Resolve-Path ./publish).Path
+
+        Write-Host "Target Site: $site"
+        Write-Host "Target Server: $server"
+        Write-Host "Deploying from $sourceDir to https://${server}:8172/msdeploy.axd?site=${site} ..."
+
+        & $msdeploy `
+          -verb:sync `
+          -source:contentPath="$sourceDir" `
+          -dest:contentPath="$site",computerName="https://${server}:8172/msdeploy.axd?site=${site}",userName="$username",password="$password",authType="Basic" `
+          -enableRule:AppOffline `
+          -allowUntrusted `
+          -verbose
+
+    - name: 📂 Fallback: Deploy via FTP if MSDeploy fails
+      if: steps.msdeploy.outcome != 'success'
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        website-name: ${{ secrets.MONSTERASP_WEBSITE_NAME || 'site80600' }}
-        server-computer-name: ${{ secrets.MONSTERASP_SERVER || 'site80600.siteasp.net' }}
-        server-username: ${{ secrets.MONSTERASP_USERNAME || 'site80600' }}
-        server-password: ${{ secrets.MONSTERASP_PASSWORD }}
-        source-path: './publish/'
-        target-path: '/'
+        server: site80600.siteasp.net
+        username: site80600
+        password: ${{ secrets.MONSTERASP_FTP_PASSWORD || 'hZ?65dD@+4cN' }}
+        local-dir: ./publish/
+        server-dir: /
