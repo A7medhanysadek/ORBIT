@@ -45,11 +45,36 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Restore API Dependencies
-      run: dotnet restore OrbitBackend/OrbitBackend.csproj
+    - name: Resolve Deployment Credentials
+      id: creds
+      shell: pwsh
+      env:
+        SERVER_SECRET: ${{ secrets.MONSTERASP_SERVER }}
+        SITE_SECRET: ${{ secrets.MONSTERASP_WEBSITE_NAME }}
+        USER_SECRET: ${{ secrets.MONSTERASP_USERNAME }}
+        PASS_SECRET: ${{ secrets.MONSTERASP_PASSWORD }}
+        FTP_PASS_SECRET: ${{ secrets.MONSTERASP_FTP_PASSWORD }}
+      run: |
+        $server = if ($env:SERVER_SECRET) { $env:SERVER_SECRET } else { "site80600.siteasp.net" }
+        $site = if ($env:SITE_SECRET) { $env:SITE_SECRET } else { "site80600" }
+        $user = if ($env:USER_SECRET) { $env:USER_SECRET } else { "site80600" }
+        $pass = if ($env:PASS_SECRET) { $env:PASS_SECRET } else { "Gs2@9_nMzH#5" }
+        $ftpPass = if ($env:FTP_PASS_SECRET) { $env:FTP_PASS_SECRET } else { "hZ?65dD@+4cN" }
 
-    - name: Publish API Project
-      run: dotnet publish OrbitBackend/OrbitBackend.csproj --configuration Release --output ./publish
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "server=$server"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "site=$site"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "user=$user"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "pass=$pass"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "ftp_pass=$ftpPass"
+
+        Write-Host "::add-mask::$pass"
+        Write-Host "::add-mask::$ftpPass"
+
+    - name: Restore API Dependencies
+      run: dotnet restore OrbitBackend/OrbitBackend.csproj --runtime win-x86
+
+    - name: Publish API Project (win-x86)
+      run: dotnet publish OrbitBackend/OrbitBackend.csproj --configuration Release --runtime win-x86 --no-self-contained --output ./publish
 
     - name: 🚀 Deploy to MonsterASP.NET via MSDeploy
       id: msdeploy
@@ -64,15 +89,15 @@ jobs:
             throw "msdeploy.exe was not found on the runner."
         }
         
-        $site = "${{ secrets.MONSTERASP_WEBSITE_NAME || 'site80600' }}"
-        $server = "${{ secrets.MONSTERASP_SERVER || 'site80600.siteasp.net' }}"
-        $username = "${{ secrets.MONSTERASP_USERNAME || 'site80600' }}"
-        $password = "${{ secrets.MONSTERASP_PASSWORD || 'Gs2@9_nMzH#5' }}"
+        $server = "${{ steps.creds.outputs.server }}"
+        $site = "${{ steps.creds.outputs.site }}"
+        $username = "${{ steps.creds.outputs.user }}"
+        $password = "${{ steps.creds.outputs.pass }}"
         $sourceDir = (Resolve-Path ./publish).Path
 
         Write-Host "Target Site: $site"
         Write-Host "Target Server: $server"
-        Write-Host "Deploying from $sourceDir to https://${server}:8172/msdeploy.axd?site=${site} ..."
+        Write-Host "Publishing to https://${server}:8172/msdeploy.axd?site=${site} ..."
 
         & $msdeploy `
           -verb:sync `
@@ -86,8 +111,8 @@ jobs:
       if: steps.msdeploy.outcome != 'success'
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: site80600.siteasp.net
-        username: site80600
-        password: ${{ secrets.MONSTERASP_FTP_PASSWORD || 'hZ?65dD@+4cN' }}
+        server: ${{ steps.creds.outputs.server }}
+        username: ${{ steps.creds.outputs.user }}
+        password: ${{ steps.creds.outputs.ftp_pass }}
         local-dir: ./publish/
-        server-dir: /
+        server-dir: /wwwroot/
