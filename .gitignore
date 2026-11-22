@@ -433,7 +433,7 @@ appsettings.json
 appsettings.Development.json
 appsettings.*.json
 
-# Streaming Server
+# Streaming Server (kept locally / published on Docker Hub)
 StreamingServer/
 
 # Local Test Files

@@ -56,6 +56,7 @@ Orbit follows a decoupled, service-oriented architecture designed to separate re
 4. **Resilience Worker (`StreamGracePeriodService`)**: An asynchronous `BackgroundService` executing periodic polling loops to handle accidental network drops without terminating streams prematurely.
 5. **Database (SQL Server)**: Relational storage managed via EF Core Code-First migrations with indexed queries and relational constraints.
 6. **Cloudinary Asset Storage**: Stores unstructured static assets including channel avatars, banners, offline screens, and custom channel emotes.
+7. **Dual Operational Dashboards**: Built dual operational dashboards: Creator Studio tracking 5 lifetime broadcast metrics and Platform Admin monitoring 7 core system entities, supported by unit test suites and Dockerized CI/CD pipelines.
 
 ---
 

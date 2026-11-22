@@ -1,0 +1,62 @@
+name: Orbit CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: 🧪 Build & Unit Tests
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore OrbitBackend.sln
+
+    - name: Build Solution
+      run: dotnet build OrbitBackend.sln --no-restore --configuration Release
+
+    - name: Run Unit Tests
+      run: dotnet test OrbitBackend.sln --no-build --configuration Release --verbosity normal
+
+  deploy-to-monsterasp:
+    name: 🚀 Deploy API to MonsterASP.NET
+    needs: build-and-test
+    runs-on: windows-latest
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name != 'pull_request'
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore API Dependencies
+      run: dotnet restore OrbitBackend\OrbitBackend.csproj
+
+    - name: Publish API Project
+      run: dotnet publish OrbitBackend\OrbitBackend.csproj --configuration Release --output ./publish
+
+    - name: Deploy to MonsterASP.NET via WebDeploy
+      uses: rasmusbuchholdt/simply-web-deploy@2.2.0
+      with:
+        website-name: ${{ secrets.MONSTERASP_WEBSITE_NAME || 'site80600' }}
+        server-computer-name: ${{ secrets.MONSTERASP_SERVER || 'site80600.siteasp.net' }}
+        server-username: ${{ secrets.MONSTERASP_USERNAME || 'site80600' }}
+        server-password: ${{ secrets.MONSTERASP_PASSWORD }}
+        source-path: './publish/'
+        target-path: '/'

@@ -11,6 +11,8 @@
 [![Cloudinary](https://img.shields.io/badge/CDN-Cloudinary-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
 
 > **ORBIT** is a next-generation, high-performance live streaming platform built on **ASP.NET Core 8**, **SignalR**, and an **NGINX-RTMP** media pipeline. It powers real-time video ingestion, low-latency HLS broadcast distribution, interactive sub-second live chat, highlight clipping, automated VOD archiving, and robust channel moderation. Experience the live client deployed at **[Orbit Web App](https://a7medhanysadek.github.io/OrbitFrontend/#home)** (source: **[OrbitFrontend](https://github.com/A7medhanysadek/OrbitFrontend)**).
+>
+> 🚀 **Engineering Highlight**: Built dual operational dashboards: Creator Studio tracking 5 lifetime broadcast metrics and Platform Admin monitoring 7 core system entities, supported by unit test suites and Dockerized CI/CD pipelines.
 
 ---
 
@@ -125,10 +127,11 @@ ORBIT features a fully integrated companion web client built with modern JavaScr
 - **Unique View Tracking**: Anti-duplication view tracker recording viewer impressions per authenticated user or visitor session.
 
 ### 4. Creator Studio & Live Manager
+- **Dual Operational Dashboards**: Built dual operational dashboards: Creator Studio tracking 5 lifetime broadcast metrics and Platform Admin monitoring 7 core system entities, supported by unit test suites and Dockerized CI/CD pipelines.
+- **5 Lifetime Broadcast Metrics**: Aggregate lifetime analytics tracking total broadcast hours, peak viewership, total VOD views, total clip views, and unique chatters count.
 - **Live Stream Manager**: Streamers monitor viewer numbers, session duration, and peak audience concurrently while broadcasting.
 - **Live Metadata Updates**: Broadcasters can update stream titles, categories, and descriptions mid-stream; updates are immediately broadcasted to all viewers via SignalR without refreshing.
 - **Channel Branding**: Full customization of avatar, banner, offline banner, channel bio, and social media handles.
-- **Broadcast Archive & Analytics**: Lifetime statistics tracking total broadcast hours, peak viewership, total VOD and clip views, and unique chatters count.
 
 ### 5. Channel Moderation (Mod View)
 - **Dedicated Moderator Dashboard**: Channel owners can recruit moderators with dedicated privileges.
@@ -142,7 +145,7 @@ ORBIT features a fully integrated companion web client built with modern JavaScr
 - **Google OAuth Login**: Seamless one-tap social authentication with automatic profile provisioning.
 - **Email OTP Verification**: Two-factor email activation and password reset tokens via MailKit.
 - **Role-Based Access Control (RBAC)**: System-level roles (`Admin`, `Streamer`, `User`) and channel-level roles (`Owner`, `Moderator`).
-- **Comprehensive Admin Panel**: Platform-wide controls to monitor active streams, force-end rogue broadcasts, manage categories, moderate clips/VODs, and review platform metrics.
+- **Comprehensive Admin Panel**: Operational dashboard monitoring 7 core system entities (Users, Channels, Active Streams, Clips, VODs, Categories, Chat Messages) with force-end controls and category moderation.
 
 ---
 
